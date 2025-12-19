@@ -102,6 +102,14 @@ const Accessioning: React.FC = () => {
     const discountVal = Number(discount);
     const paidVal = Number(amountPaid);
 
+    if (discountVal < 0) {
+        alert("Error: Discount cannot be negative.");
+        return;
+    }
+    if (paidVal < 0) {
+        alert("Error: Payment amount cannot be negative.");
+        return;
+    }
     if (discountVal > subtotal) {
         alert("Error: Discount cannot exceed subtotal amount.");
         return;
@@ -537,6 +545,8 @@ const Accessioning: React.FC = () => {
                <div className="flex items-center w-24">
                  <span className="text-slate-400 mr-1">-</span>
                  <input 
+                   type="number"
+                   min="0"
                    className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm font-mono focus:ring-1 focus:ring-blue-500 outline-none text-orange-600 font-medium"
                    value={discount}
                    onChange={(e) => setDiscount(e.target.value)}
@@ -564,6 +574,8 @@ const Accessioning: React.FC = () => {
                <div className="relative">
                  <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">Rs.</span>
                  <input 
+                   type="number"
+                   min="0"
                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-green-700 focus:ring-2 focus:ring-green-500 outline-none"
                    value={amountPaid}
                    onChange={(e) => setAmountPaid(e.target.value)}

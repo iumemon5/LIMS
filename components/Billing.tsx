@@ -51,8 +51,15 @@ const Billing: React.FC = () => {
 
   const handlePayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedInvoiceId && paymentAmount) {
-       recordPayment(selectedInvoiceId, parseFloat(paymentAmount));
+    const amount = parseFloat(paymentAmount);
+    
+    if (selectedInvoiceId && amount > 0) {
+       if (selectedInvoice && amount > selectedInvoice.dueAmount) {
+           alert("Payment amount cannot exceed the outstanding balance.");
+           return;
+       }
+       
+       recordPayment(selectedInvoiceId, amount);
        setPaymentSuccess(true);
        setTimeout(() => {
           setPaymentSuccess(false);
@@ -339,6 +346,7 @@ const Billing: React.FC = () => {
                                <input 
                                   autoFocus
                                   type="number"
+                                  min="0"
                                   className="w-full mt-1 border border-slate-300 rounded-xl px-4 py-3 text-2xl font-black text-slate-900 focus:ring-2 focus:ring-green-500 outline-none"
                                   placeholder="0"
                                   max={selectedInvoice.dueAmount}

@@ -254,8 +254,15 @@ export const LabProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if ([SampleStatus.RECEIVED, SampleStatus.COLLECTED, SampleStatus.IN_LAB].includes(targetReq.status)) {
           newStatus = SampleStatus.TESTING;
       }
-      // If already TESTING, VERIFIED, PUBLISHED, or REJECTED, do not change status automatically based on result entry
-      // This prevents "Regression" bugs where editing a verified report sets it back to Testing.
+      
+      // Check if all analyses are now complete
+      const allComplete = updatedAnalyses.every(a => a.status === 'Complete');
+      
+      // If all are complete and we were in TESTING phase, auto-advance to VERIFIED
+      // This prevents stuck workflows
+      if (allComplete && newStatus === SampleStatus.TESTING) {
+          newStatus = SampleStatus.VERIFIED;
+      }
 
       const updatedReq = { ...targetReq, analyses: updatedAnalyses, status: newStatus, updatedAt: ts };
       logAction('RESULT_ENTRY', 'AnalysisRequest', requestId, `Entered ${keyword}`, before, updatedReq);
@@ -358,9 +365,21 @@ export const LabProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [logAction]);
 
   const recordPayment = useCallback((requestId: string, amount: number) => {
+    // Validate inputs
+    if (amount <= 0) {
+        console.error("Invalid payment amount: must be positive.");
+        return;
+    }
+
     const ts = new Date().toISOString();
     setRequests(prev => prev.map(req => {
       if (req.id === requestId) {
+        // Prevent overpayment
+        if (amount > req.dueAmount + 0.01) { // small tolerance for float math
+             console.warn("Payment exceeds due amount. Transaction aborted.");
+             return req; 
+        }
+
         const before = { ...req };
         const newPaid = req.paidAmount + amount;
         const newDue = Math.max(0, (req.totalFee - req.discount) - newPaid);

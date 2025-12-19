@@ -14,7 +14,7 @@ import Inventory from './components/Inventory';
 import Worksheets from './components/Worksheets';
 import Settings from './components/Settings';
 import Instruments from './components/Instruments';
-import { Settings as SettingsIcon, FlaskConical, Lock, ChevronRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, FlaskConical, Lock, ChevronRight, AlertCircle, Eye, EyeOff, User as UserIcon } from 'lucide-react';
 import { LabProvider, useLab } from './contexts/LabContext';
 
 const ProtectedApp: React.FC = () => {
@@ -73,25 +73,22 @@ const ProtectedApp: React.FC = () => {
                <div className="space-y-4">
                   <div className="space-y-1">
                      <label className="text-xs font-black text-slate-500 uppercase">Email Address</label>
-                     {/* User Selector for Demo Convenience (still requires password) */}
                      <div className="relative">
-                        <select 
-                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-[#005c97] outline-none appearance-none"
+                        <input 
+                           type="email"
+                           className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-[#005c97] outline-none"
                            value={email}
                            onChange={e => setEmail(e.target.value)}
-                        >
-                           {users.map(u => (
-                              <option key={u.id} value={u.email}>{u.name} ({u.role})</option>
-                           ))}
-                        </select>
-                        <ChevronRight className="absolute right-4 top-3.5 text-slate-400 rotate-90" size={16} />
+                           placeholder="user@example.com"
+                        />
+                        <UserIcon className="absolute left-3 top-3.5 text-slate-400" size={16} />
                      </div>
                   </div>
 
                   <div className="space-y-1">
                      <div className="flex justify-between">
                         <label className="text-xs font-black text-slate-500 uppercase">Password</label>
-                        <span className="text-[10px] text-slate-400">Default: admin123</span>
+                        <span className="text-[10px] text-slate-400">Hint: admin123</span>
                      </div>
                      <div className="relative">
                         <input 
