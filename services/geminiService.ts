@@ -2,8 +2,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { AnalysisRequest, Client } from '../types';
 
-// Initialize with environment check
-const apiKey = process.env.API_KEY;
+// Initialize with environment check - Support both standard and README documented keys
+const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+
 if (!apiKey) {
   console.warn("Gemini API Key is missing. AI features will be disabled.");
 }

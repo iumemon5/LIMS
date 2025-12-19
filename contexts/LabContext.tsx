@@ -31,7 +31,7 @@ interface LabContextType {
   settings: LabSettings;
   
   // Auth Actions
-  login: (email: string) => boolean;
+  login: (email: string, password?: string) => boolean;
   logout: () => void;
 
   // Data Access Helpers
@@ -40,7 +40,7 @@ interface LabContextType {
   getDepartmentById: (id: string) => Department | undefined;
   
   // Mutations
-  addPatient: (patient: Omit<Patient, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => void;
+  addPatient: (patient: Omit<Patient, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => string;
   updatePatient: (patient: Patient) => void;
   deletePatient: (id: string) => void;
   
@@ -162,9 +162,13 @@ export const LabProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [user]);
 
   // Auth Methods
-  const login = (email: string): boolean => {
+  const login = (email: string, password?: string): boolean => {
       const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.status === 'Active');
       if (foundUser) {
+          // Simple auth check. In a real app, this would use hashed passwords.
+          if (foundUser.password && foundUser.password !== password) {
+              return false;
+          }
           const updatedUser = { ...foundUser, lastLogin: new Date().toISOString() };
           setUser(updatedUser);
           setUsers(prev => prev.map(u => u.id === foundUser.id ? updatedUser : u));
@@ -183,11 +187,13 @@ export const LabProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const getClientById = useCallback((id: string) => clients.find(c => c.id === id), [clients]);
   const getDepartmentById = useCallback((id: string) => departments.find(d => d.id === id), [departments]);
 
-  const addPatient = useCallback((patientData: Omit<Patient, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
+  const addPatient = useCallback((patientData: Omit<Patient, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>): string => {
     const ts = new Date().toISOString();
-    const newPatient: Patient = { ...patientData, id: generateSecureId('PAT'), createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
+    const id = generateSecureId('PAT');
+    const newPatient: Patient = { ...patientData, id, createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
     setPatients(prev => [newPatient, ...prev]);
     logAction('CREATE', 'Patient', newPatient.id, `Registered: ${newPatient.firstName}`, null, newPatient);
+    return id;
   }, [logAction, user]);
 
   const updatePatient = useCallback((updatedPatient: Patient) => {
@@ -236,11 +242,21 @@ export const LabProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const targetReq = prev.find(r => r.id === requestId);
       if (!targetReq) return prev;
       const before = JSON.parse(JSON.stringify(targetReq));
+      
       const updatedAnalyses = targetReq.analyses.map(analysis => 
         analysis.keyword === keyword ? { ...analysis, result, status: 'Complete' as const } : analysis
       );
-      const allComplete = updatedAnalyses.every(a => a.status === 'Complete');
-      const newStatus = allComplete ? SampleStatus.TESTING : targetReq.status;
+      
+      // Determine new status without regressing if already verified/published
+      let newStatus = targetReq.status;
+      
+      // Only advance to TESTING automatically if currently in a pre-testing state
+      if ([SampleStatus.RECEIVED, SampleStatus.COLLECTED, SampleStatus.IN_LAB].includes(targetReq.status)) {
+          newStatus = SampleStatus.TESTING;
+      }
+      // If already TESTING, VERIFIED, PUBLISHED, or REJECTED, do not change status automatically based on result entry
+      // This prevents "Regression" bugs where editing a verified report sets it back to Testing.
+
       const updatedReq = { ...targetReq, analyses: updatedAnalyses, status: newStatus, updatedAt: ts };
       logAction('RESULT_ENTRY', 'AnalysisRequest', requestId, `Entered ${keyword}`, before, updatedReq);
       return prev.map(r => r.id === requestId ? updatedReq : r);

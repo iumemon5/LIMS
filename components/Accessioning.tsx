@@ -12,7 +12,7 @@ import { formatCurrency } from '../utils/formatters';
 import { Invoice } from './Invoice';
 
 const Accessioning: React.FC = () => {
-  const { patients, departments, clients, addRequest, addPatient, settings } = useLab();
+  const { patients, departments, clients, addRequest, addPatient, settings, getPatientById } = useLab();
   
   // State
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -48,8 +48,8 @@ const Accessioning: React.FC = () => {
 
   // Computed
   const subtotal = selectedTests.reduce((acc, t) => acc + t.price, 0);
-  const total = subtotal - Number(discount);
-  const balance = total - Number(amountPaid);
+  const total = Math.max(0, subtotal - Number(discount));
+  const balance = Math.max(0, total - Number(amountPaid));
 
   const filteredTests = useMemo(() => {
     if (!testSearch) return [];
@@ -98,6 +98,19 @@ const Accessioning: React.FC = () => {
   const handleSave = (shouldPrint: boolean = false) => {
     if (!selectedPatient || selectedTests.length === 0) return;
 
+    // Billing Validation
+    const discountVal = Number(discount);
+    const paidVal = Number(amountPaid);
+
+    if (discountVal > subtotal) {
+        alert("Error: Discount cannot exceed subtotal amount.");
+        return;
+    }
+    if (paidVal > (subtotal - discountVal)) {
+        alert("Error: Payment amount cannot exceed the total payable.");
+        return;
+    }
+
     const newRequestData = {
       clientId: selectedClient?.id || 'WALK-IN',
       patientId: selectedPatient.id,
@@ -105,9 +118,9 @@ const Accessioning: React.FC = () => {
       status: SampleStatus.RECEIVED,
       dateReceived: new Date().toISOString().split('T')[0],
       priority: priority as any,
-      totalFee: total,
-      discount: Number(discount),
-      paidAmount: Number(amountPaid),
+      totalFee: subtotal, // Store raw total, discount applied on top
+      discount: discountVal,
+      paidAmount: paidVal,
       dueAmount: balance,
       referrer: referrer,
       analyses: selectedTests.map(t => ({
@@ -203,24 +216,19 @@ const Accessioning: React.FC = () => {
       cnic: ''
     };
 
-    addPatient(payload);
+    // Use returned ID to set active patient
+    const newId = addPatient(payload);
     setIsPatientModalOpen(false);
     
-    // Auto-select the newly created patient using the known MRN to find it in the updated context
-    // Since patients update async, we might not find it immediately in 'patients' array here.
-    // However, for this demo flow, setting it manually is cleaner UI.
-    const createdPatient: Patient = {
-        ...payload,
-        id: 'TEMP', // We don't have the ID here since addPatient is void, but we can search by MRN later or just display
-        // Hack for display:
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        createdBy: 'Me'
-    };
-    
-    // We try to find it in the next render cycle, but setting a temporary object works for the UI display
-    // A better approach is usually returning the ID from addPatient too, but let's just use the search logic for now.
-    setPatientSearch(mrn);
+    // Fetch the newly created patient object using the ID
+    // We delay slightly to ensure state propagation if needed, but context update is usually immediate in this simple model
+    setTimeout(() => {
+        const createdPatient = getPatientById(newId);
+        if (createdPatient) {
+            setSelectedPatient(createdPatient);
+            setPatientSearch('');
+        }
+    }, 50);
     
     // Reset form
     setNewPatient({

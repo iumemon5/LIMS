@@ -14,15 +14,17 @@ import Inventory from './components/Inventory';
 import Worksheets from './components/Worksheets';
 import Settings from './components/Settings';
 import Instruments from './components/Instruments';
-import { Settings as SettingsIcon, FlaskConical, Lock, ChevronRight, AlertCircle } from 'lucide-react';
+import { Settings as SettingsIcon, FlaskConical, Lock, ChevronRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { LabProvider, useLab } from './contexts/LabContext';
 
 const ProtectedApp: React.FC = () => {
   const { user, login, users } = useLab();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [email, setEmail] = useState('admin@msolutions.pk');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // If no user is logged in, show Login Screen
   if (!user) {
@@ -33,11 +35,11 @@ const ProtectedApp: React.FC = () => {
       
       // Simulate network delay for effect
       setTimeout(() => {
-        const success = login(email);
+        const success = login(email, password);
         if (success) {
            setIsAnimating(false);
         } else {
-           setError('Invalid credentials or inactive account.');
+           setError('Invalid email or password.');
            setIsAnimating(false);
         }
       }, 800);
@@ -71,7 +73,7 @@ const ProtectedApp: React.FC = () => {
                <div className="space-y-4">
                   <div className="space-y-1">
                      <label className="text-xs font-black text-slate-500 uppercase">Email Address</label>
-                     {/* Demo User Selector for ease of use */}
+                     {/* User Selector for Demo Convenience (still requires password) */}
                      <div className="relative">
                         <select 
                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-[#005c97] outline-none appearance-none"
@@ -83,6 +85,29 @@ const ProtectedApp: React.FC = () => {
                            ))}
                         </select>
                         <ChevronRight className="absolute right-4 top-3.5 text-slate-400 rotate-90" size={16} />
+                     </div>
+                  </div>
+
+                  <div className="space-y-1">
+                     <div className="flex justify-between">
+                        <label className="text-xs font-black text-slate-500 uppercase">Password</label>
+                        <span className="text-[10px] text-slate-400">Default: admin123</span>
+                     </div>
+                     <div className="relative">
+                        <input 
+                           type={showPassword ? 'text' : 'password'}
+                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-[#005c97] outline-none"
+                           value={password}
+                           onChange={e => setPassword(e.target.value)}
+                           placeholder="Enter your password"
+                        />
+                        <button 
+                           type="button"
+                           onClick={() => setShowPassword(!showPassword)}
+                           className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600"
+                        >
+                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
                      </div>
                   </div>
 
