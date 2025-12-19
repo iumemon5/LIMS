@@ -9,6 +9,8 @@ import {
   DEFAULT_USERS, PATIENTS, MOCK_REQUESTS, DEPARTMENTS, 
   CLIENTS, DEFAULT_SETTINGS, AUDIT_LOGS 
 } from '../constants';
+import { computeRequestStatus } from '../utils/analysis';
+import { applyPayment } from '../utils/billing';
 
 interface LabContextType {
   user: User | null;
@@ -182,29 +184,11 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateAnalysisResult = (reqId: string, keyword: string, value: string) => {
       setRequests(prev => prev.map(req => {
           if (req.id === reqId) {
-              // 1. Update the specific analysis
               const updatedAnalyses = req.analyses.map(a => 
                   a.keyword === keyword ? { ...a, result: value, status: 'Complete' as const } : a
               );
-              
-              // 2. Check if all analyses in the request are now complete
-              const allComplete = updatedAnalyses.every(a => a.status === 'Complete');
-              
-              let newStatus = req.status;
 
-              // 3. Status Transition Logic
-              // If status is "Received", "Collected" or "In Lab", result entry moves it to "Testing"
-              if ([SampleStatus.RECEIVED, SampleStatus.COLLECTED, SampleStatus.IN_LAB].includes(req.status)) {
-                  newStatus = SampleStatus.TESTING;
-              }
-
-              // If ALL results are complete, move to "Verified" (Terminal for workbench)
-              // Only advance if currently in an active processing state. 
-              // Do NOT regress if already "Published" or "Rejected".
-              if (allComplete && [SampleStatus.RECEIVED, SampleStatus.COLLECTED, SampleStatus.IN_LAB, SampleStatus.TESTING].includes(newStatus)) {
-                  newStatus = SampleStatus.VERIFIED;
-              }
-              
+              const newStatus = computeRequestStatus(req.status, updatedAnalyses);
               return { ...req, analyses: updatedAnalyses, status: newStatus, updatedAt: new Date().toISOString() };
           }
           return req;
@@ -232,19 +216,14 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRequests(prev => prev.map(req => {
       if (req.id === requestId) {
         const netTotal = req.totalFee - req.discount;
-        const remainingBalance = Math.max(0, netTotal - req.paidAmount);
-        
-        // Cap payment at remaining balance to prevent overpayment
-        const paymentToRecord = Math.min(amount, remainingBalance);
-        
-        if (paymentToRecord <= 0) return req;
+        const { applied, newPaid, newDue } = applyPayment(req.paidAmount, netTotal, amount);
+
+        if (applied <= 0) return req;
 
         const before = { ...req };
-        const newPaid = req.paidAmount + paymentToRecord;
-        const newDue = Math.max(0, netTotal - newPaid);
         const updated = { ...req, paidAmount: newPaid, dueAmount: newDue, updatedAt: ts };
         
-        logAction('FINANCE', 'AnalysisRequest', requestId, `Payment Recorded: ${paymentToRecord}`, before, updated);
+        logAction('FINANCE', 'AnalysisRequest', requestId, `Payment Recorded: ${applied}`, before, updated);
         return updated;
       }
       return req;
