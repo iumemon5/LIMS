@@ -1,489 +1,406 @@
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
-  Patient, 
-  AnalysisRequest, 
-  Department, 
-  SampleStatus, 
-  InventoryItem, 
-  Client, 
-  TestDefinition, 
-  AuditLog, 
-  Worksheet, 
-  Instrument,
-  Priority,
-  LabSettings,
-  User
+  User, Patient, AnalysisRequest, Department, Client, 
+  InventoryItem, Worksheet, Instrument, AuditLog, LabSettings,
+  SampleStatus, TestDefinition
 } from '../types';
-import { PATIENTS, DEPARTMENTS, MOCK_REQUESTS, CLIENTS, AUDIT_LOGS, SCHEMA_VERSION, DEFAULT_SETTINGS, DEFAULT_USERS } from '../constants';
+import { 
+  DEFAULT_USERS, PATIENTS, MOCK_REQUESTS, DEPARTMENTS, 
+  CLIENTS, DEFAULT_SETTINGS, AUDIT_LOGS 
+} from '../constants';
 
 interface LabContextType {
-  user: User | null; // The authenticated user
-  patients: Patient[];
-  requests: AnalysisRequest[];
-  departments: Department[];
-  inventory: InventoryItem[];
-  clients: Client[];
-  auditLogs: AuditLog[];
-  worksheets: Worksheet[];
-  instruments: Instrument[];
+  user: User | null;
   users: User[];
-  settings: LabSettings;
-  
-  // Auth Actions
-  login: (email: string, password?: string) => boolean;
+  login: (email: string, pass: string) => boolean;
   logout: () => void;
-
-  // Data Access Helpers
-  getPatientById: (id: string) => Patient | undefined;
-  getClientById: (id: string) => Client | undefined;
-  getDepartmentById: (id: string) => Department | undefined;
+  addUser: (user: User) => void;
+  updateUserStatus: (id: string, status: 'Active' | 'Inactive') => void;
   
-  // Mutations
-  addPatient: (patient: Omit<Patient, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => string;
+  patients: Patient[];
+  addPatient: (patient: Partial<Patient>) => string;
   updatePatient: (patient: Patient) => void;
   deletePatient: (id: string) => void;
+  getPatientById: (id: string) => Patient | undefined;
   
-  addRequest: (request: Omit<AnalysisRequest, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => string;
-  updateRequestStatus: (id: string, status: SampleStatus) => void;
-  updateAnalysisResult: (requestId: string, keyword: string, result: string) => void;
-  rejectSample: (requestId: string, reason: string) => void;
+  requests: AnalysisRequest[];
+  addRequest: (req: Partial<AnalysisRequest>) => string;
+  updateAnalysisResult: (reqId: string, keyword: string, value: string) => void;
+  updateRequestStatus: (reqId: string, status: SampleStatus) => void;
+  rejectSample: (reqId: string, reason: string) => void;
+  recordPayment: (reqId: string, amount: number) => void;
   
-  updateStock: (itemId: string, quantity: number) => void;
-  addInventoryItem: (item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => void;
-  
-  addDepartment: (dept: Omit<Department, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => void;
-  addTest: (deptId: string, test: TestDefinition) => void;
-  updateTest: (deptId: string, test: TestDefinition) => void;
-  deleteTest: (deptId: string, testCode: string) => void;
-  
-  addClient: (client: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => void;
+  clients: Client[];
+  addClient: (client: Client) => void;
   updateClient: (client: Client) => void;
   
-  recordPayment: (requestId: string, amount: number) => void;
+  departments: Department[];
+  addDepartment: (dept: Department) => void;
+  addTest: (deptId: string, test: TestDefinition) => void;
+  updateTest: (deptId: string, test: TestDefinition) => void;
+  deleteTest: (deptId: string, code: string) => void;
   
-  createWorksheet: (ws: Omit<Worksheet, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => void;
+  worksheets: Worksheet[];
+  createWorksheet: (ws: Worksheet) => void;
   closeWorksheet: (id: string) => void;
-
-  addInstrument: (instrument: Omit<Instrument, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => void;
-  importInstrumentData: (data: {requestId: string, testCode: string, result: string}[]) => {success: number, failed: number};
   
-  addUser: (user: Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => void;
-  updateUserStatus: (id: string, status: 'Active' | 'Inactive') => void;
-
-  updateSettings: (newSettings: Partial<LabSettings>) => void;
-  logReportGeneration: (reportType: string, format: string) => void;
-  logQC: (instrument: string, result: string, details: string) => void;
+  inventory: InventoryItem[];
+  addInventoryItem: (item: InventoryItem) => void;
+  updateStock: (id: string, quantity: number) => void;
+  
+  instruments: Instrument[];
+  addInstrument: (inst: Instrument) => void;
+  importInstrumentData: (data: any[]) => { success: number; failed: number };
+  
+  settings: LabSettings;
+  updateSettings: (s: LabSettings) => void;
+  
+  auditLogs: AuditLog[];
+  logQC: (instrument: string, result: string, notes: string) => void;
+  logReportGeneration: (type: string, format: string) => void;
 }
 
 const LabContext = createContext<LabContextType | undefined>(undefined);
 
-const generateSecureId = (prefix: string = 'ID'): string => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `${prefix}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
-  }
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-};
+export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>(DEFAULT_USERS);
+  const [patients, setPatients] = useState<Patient[]>(PATIENTS);
+  const [requests, setRequests] = useState<AnalysisRequest[]>(MOCK_REQUESTS);
+  const [clients, setClients] = useState<Client[]>(CLIENTS);
+  const [departments, setDepartments] = useState<Department[]>(DEPARTMENTS);
+  const [worksheets, setWorksheets] = useState<Worksheet[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([
+      { id: 'INV-001', name: 'Glucose Reagent', category: 'Reagent', lotNumber: 'LOT-GLU-24', expiryDate: '2025-12-31', quantity: 15, unit: 'Kits', minLevel: 5, location: 'Fridge A', createdAt: '', updatedAt: '', createdBy: 'system' }
+  ]);
+  const [instruments, setInstruments] = useState<Instrument[]>([
+      { id: 'INST-001', name: 'Cobas c311', type: 'Chemistry Analyzer', protocol: 'HL7', ipAddress: '192.168.1.50', status: 'Online', createdAt: '', updatedAt: '', createdBy: 'system' }
+  ]);
+  const [settings, setSettingsState] = useState<LabSettings>(DEFAULT_SETTINGS);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(AUDIT_LOGS);
 
-const storage = {
-  get: <T,>(key: string, defaultValue: T): T => {
-    try {
-      const storedVersion = localStorage.getItem('lims_schema_version');
-      if (storedVersion !== SCHEMA_VERSION) {
-        console.warn(`Schema version mismatch (Stored: ${storedVersion}, App: ${SCHEMA_VERSION}). Performing soft-reset.`);
-        localStorage.setItem('lims_schema_version', SCHEMA_VERSION);
-        return defaultValue;
-      }
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue;
-    } catch (e) {
-      console.error(`Persistence failure for ${key}:`, e);
-      return defaultValue;
-    }
-  },
-  set: <T,>(key: string, value: T): void => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      console.error(`Storage error for ${key}:`, e);
-    }
-  }
-};
-
-export const LabProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => storage.get('lims_session_user', null));
-  
-  const [patients, setPatients] = useState<Patient[]>(() => storage.get('lims_patients', PATIENTS));
-  const [requests, setRequests] = useState<AnalysisRequest[]>(() => storage.get('lims_requests', MOCK_REQUESTS));
-  const [departments, setDepartments] = useState<Department[]>(() => storage.get('lims_departments', DEPARTMENTS));
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => storage.get('lims_inventory', []));
-  const [instruments, setInstruments] = useState<Instrument[]>(() => storage.get('lims_instruments', []));
-  const [clients, setClients] = useState<Client[]>(() => storage.get('lims_clients', CLIENTS));
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => storage.get('lims_auditLogs', AUDIT_LOGS));
-  const [worksheets, setWorksheets] = useState<Worksheet[]>(() => storage.get('lims_worksheets', []));
-  const [users, setUsers] = useState<User[]>(() => storage.get('lims_users', DEFAULT_USERS));
-  const [settings, setSettings] = useState<LabSettings>(() => storage.get('lims_settings', DEFAULT_SETTINGS));
-
-  useEffect(() => {
-    storage.set('lims_session_user', user);
-    storage.set('lims_patients', patients);
-    storage.set('lims_requests', requests);
-    storage.set('lims_departments', departments);
-    storage.set('lims_inventory', inventory);
-    storage.set('lims_instruments', instruments);
-    storage.set('lims_clients', clients);
-    storage.set('lims_auditLogs', auditLogs);
-    storage.set('lims_worksheets', worksheets);
-    storage.set('lims_users', users);
-    storage.set('lims_settings', settings);
-  }, [user, patients, requests, departments, inventory, instruments, clients, auditLogs, worksheets, users, settings]);
-
-  const logAction = useCallback((
-    action: string, 
-    resourceType: string, 
-    resourceId: string, 
-    details: string,
-    before?: any,
-    after?: any
-  ) => {
+  const logAction = useCallback((action: string, resourceType: string, resourceId: string, details: string, before?: any, after?: any) => {
     const newLog: AuditLog = {
-      id: generateSecureId('LOG'),
-      timestamp: new Date().toISOString(),
-      user: user?.name || 'System',
-      action,
-      resourceType,
-      resourceId,
-      before: before ? JSON.stringify(before) : undefined,
-      after: after ? JSON.stringify(after) : undefined,
-      correlationId: generateSecureId('CID'),
-      details
+        id: `LOG-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+        timestamp: new Date().toISOString(),
+        user: user?.name || 'System',
+        action,
+        resourceType,
+        resourceId,
+        details,
+        correlationId: 'CID-' + Date.now(),
+        before: before ? JSON.stringify(before) : undefined,
+        after: after ? JSON.stringify(after) : undefined
     };
     setAuditLogs(prev => [newLog, ...prev]);
   }, [user]);
 
-  // Auth Methods
-  const login = (email: string, password?: string): boolean => {
-      const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.status === 'Active');
-      if (foundUser) {
-          // Simple auth check. In a real app, this would use hashed passwords.
-          if (foundUser.password && foundUser.password !== password) {
-              return false;
-          }
-          const updatedUser = { ...foundUser, lastLogin: new Date().toISOString() };
-          setUser(updatedUser);
-          setUsers(prev => prev.map(u => u.id === foundUser.id ? updatedUser : u));
-          logAction('LOGIN', 'Session', foundUser.id, 'User logged in successfully');
-          return true;
-      }
-      return false;
+  // User Auth with Mock Hashing
+  const login = (email: string, pass: string) => {
+    // Simulate server-side hashing comparison
+    const inputHash = btoa(pass); 
+    const found = users.find(u => 
+        u.email.toLowerCase() === email.toLowerCase() && 
+        u.passwordHash === inputHash && 
+        u.status === 'Active'
+    );
+    if (found) {
+        setUser(found);
+        logAction('LOGIN', 'User', found.id, 'User logged in');
+        return true;
+    }
+    return false;
   };
 
   const logout = () => {
-      if (user) logAction('LOGOUT', 'Session', user.id, 'User logged out');
+      if (user) logAction('LOGOUT', 'User', user.id, 'User logged out');
       setUser(null);
   };
 
-  const getPatientById = useCallback((id: string) => patients.find(p => p.id === id), [patients]);
-  const getClientById = useCallback((id: string) => clients.find(c => c.id === id), [clients]);
-  const getDepartmentById = useCallback((id: string) => departments.find(d => d.id === id), [departments]);
+  const addUser = (u: User) => {
+      // Default new users to 'admin123' if not specified
+      const newUser = { 
+          ...u, 
+          id: `USR-${Date.now()}`, 
+          passwordHash: u.passwordHash || btoa('admin123'),
+          createdAt: new Date().toISOString(), 
+          updatedAt: new Date().toISOString(), 
+          createdBy: user?.name || 'Admin' 
+      };
+      setUsers([...users, newUser]);
+      logAction('CREATE', 'User', newUser.id, `Created user ${u.name}`);
+  };
 
-  const addPatient = useCallback((patientData: Omit<Patient, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>): string => {
-    const ts = new Date().toISOString();
-    const id = generateSecureId('PAT');
-    const newPatient: Patient = { ...patientData, id, createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
-    setPatients(prev => [newPatient, ...prev]);
-    logAction('CREATE', 'Patient', newPatient.id, `Registered: ${newPatient.firstName}`, null, newPatient);
-    return id;
-  }, [logAction, user]);
+  const updateUserStatus = (id: string, status: 'Active' | 'Inactive') => {
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status } : u));
+      logAction('UPDATE', 'User', id, `Updated status to ${status}`);
+  };
 
-  const updatePatient = useCallback((updatedPatient: Patient) => {
-    const ts = new Date().toISOString();
-    setPatients(prev => {
-      const before = prev.find(p => p.id === updatedPatient.id);
-      const updated = { ...updatedPatient, updatedAt: ts };
-      logAction('UPDATE', 'Patient', updated.id, `Updated: ${updated.firstName}`, before, updated);
-      return prev.map(p => p.id === updated.id ? updated : p);
-    });
-  }, [logAction]);
+  // Patients
+  const addPatient = (p: Partial<Patient>) => {
+      const id = `PAT-${Date.now()}`;
+      const newPatient = { 
+          ...p, 
+          id, 
+          createdAt: new Date().toISOString(), 
+          updatedAt: new Date().toISOString(), 
+          createdBy: user?.name || 'Staff' 
+      } as Patient;
+      setPatients(prev => [newPatient, ...prev]);
+      logAction('CREATE', 'Patient', id, `Registered patient ${p.firstName} ${p.lastName}`);
+      return id;
+  };
 
-  const deletePatient = useCallback((id: string) => {
-      setPatients(prev => {
-          const target = prev.find(p => p.id === id);
-          if (target) {
-              logAction('DELETE', 'Patient', id, `Deleted: ${target.firstName}`, target, null);
+  const updatePatient = (p: Patient) => {
+      setPatients(prev => prev.map(pat => pat.id === p.id ? { ...p, updatedAt: new Date().toISOString() } : pat));
+      logAction('UPDATE', 'Patient', p.id, `Updated demographics`);
+  };
+
+  const deletePatient = (id: string) => {
+      setPatients(prev => prev.filter(p => p.id !== id));
+      logAction('DELETE', 'Patient', id, `Deleted record`);
+  };
+
+  const getPatientById = (id: string) => patients.find(p => p.id === id);
+
+  // Requests
+  const addRequest = (req: Partial<AnalysisRequest>) => {
+      const id = `AR-${new Date().getFullYear().toString().slice(-2)}-${String(requests.length + 1).padStart(4, '0')}`;
+      const newReq = { 
+          ...req, 
+          id, 
+          createdAt: new Date().toISOString(), 
+          updatedAt: new Date().toISOString(), 
+          createdBy: user?.name || 'Staff' 
+      } as AnalysisRequest;
+      setRequests(prev => [newReq, ...prev]);
+      logAction('CREATE', 'AnalysisRequest', id, `Created request`);
+      return id;
+  };
+
+  const updateAnalysisResult = (reqId: string, keyword: string, value: string) => {
+      setRequests(prev => prev.map(req => {
+          if (req.id === reqId) {
+              // 1. Update the specific analysis
+              const updatedAnalyses = req.analyses.map(a => 
+                  a.keyword === keyword ? { ...a, result: value, status: 'Complete' as const } : a
+              );
+              
+              // 2. Check if all analyses in the request are now complete
+              const allComplete = updatedAnalyses.every(a => a.status === 'Complete');
+              
+              let newStatus = req.status;
+
+              // 3. Status Transition Logic
+              // If status is "Received", "Collected" or "In Lab", result entry moves it to "Testing"
+              if ([SampleStatus.RECEIVED, SampleStatus.COLLECTED, SampleStatus.IN_LAB].includes(req.status)) {
+                  newStatus = SampleStatus.TESTING;
+              }
+
+              // If ALL results are complete, move to "Verified" (Terminal for workbench)
+              // Only advance if currently in an active processing state. 
+              // Do NOT regress if already "Published" or "Rejected".
+              if (allComplete && [SampleStatus.RECEIVED, SampleStatus.COLLECTED, SampleStatus.IN_LAB, SampleStatus.TESTING].includes(newStatus)) {
+                  newStatus = SampleStatus.VERIFIED;
+              }
+              
+              return { ...req, analyses: updatedAnalyses, status: newStatus, updatedAt: new Date().toISOString() };
           }
-          return prev.filter(p => p.id !== id);
-      });
-  }, [logAction]);
+          return req;
+      }));
+  };
 
-  const addRequest = useCallback((requestData: Omit<AnalysisRequest, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>): string => {
-    const ts = new Date().toISOString();
-    const id = generateSecureId('AR');
-    const newRequest: AnalysisRequest = { ...requestData, id, createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
-    setRequests(prev => [newRequest, ...prev]);
-    logAction('CREATE', 'AnalysisRequest', newRequest.id, `Accessioning: ${newRequest.patientId}`, null, newRequest);
-    return id;
-  }, [logAction, user]);
+  const updateRequestStatus = (reqId: string, status: SampleStatus) => {
+      setRequests(prev => prev.map(req => req.id === reqId ? { ...req, status, updatedAt: new Date().toISOString() } : req));
+      logAction('UPDATE', 'AnalysisRequest', reqId, `Status changed to ${status}`);
+  };
 
-  const updateRequestStatus = useCallback((id: string, status: SampleStatus) => {
-    const ts = new Date().toISOString();
-    setRequests(prev => {
-      const before = prev.find(r => r.id === id);
-      if (!before) return prev;
-      const updated = { ...before, status, updatedAt: ts };
-      logAction('STATUS_CHANGE', 'AnalysisRequest', id, `Moved to ${status}`, before, updated);
-      return prev.map(r => r.id === id ? updated : r);
-    });
-  }, [logAction]);
+  const rejectSample = (reqId: string, reason: string) => {
+      setRequests(prev => prev.map(req => req.id === reqId ? { ...req, status: SampleStatus.REJECTED, updatedAt: new Date().toISOString() } : req));
+      logAction('REJECT', 'AnalysisRequest', reqId, `Sample rejected: ${reason}`);
+  };
 
-  const updateAnalysisResult = useCallback((requestId: string, keyword: string, result: string) => {
-    const ts = new Date().toISOString();
-    setRequests(prev => {
-      const targetReq = prev.find(r => r.id === requestId);
-      if (!targetReq) return prev;
-      const before = JSON.parse(JSON.stringify(targetReq));
-      
-      const updatedAnalyses = targetReq.analyses.map(analysis => 
-        analysis.keyword === keyword ? { ...analysis, result, status: 'Complete' as const } : analysis
-      );
-      
-      // Determine new status without regressing if already verified/published
-      let newStatus = targetReq.status;
-      
-      // Only advance to TESTING automatically if currently in a pre-testing state
-      if ([SampleStatus.RECEIVED, SampleStatus.COLLECTED, SampleStatus.IN_LAB].includes(targetReq.status)) {
-          newStatus = SampleStatus.TESTING;
-      }
-      
-      // Check if all analyses are now complete
-      const allComplete = updatedAnalyses.every(a => a.status === 'Complete');
-      
-      // If all are complete and we were in TESTING phase, auto-advance to VERIFIED
-      // This prevents stuck workflows
-      if (allComplete && newStatus === SampleStatus.TESTING) {
-          newStatus = SampleStatus.VERIFIED;
-      }
-
-      const updatedReq = { ...targetReq, analyses: updatedAnalyses, status: newStatus, updatedAt: ts };
-      logAction('RESULT_ENTRY', 'AnalysisRequest', requestId, `Entered ${keyword}`, before, updatedReq);
-      return prev.map(r => r.id === requestId ? updatedReq : r);
-    });
-  }, [logAction]);
-
-  const rejectSample = useCallback((requestId: string, reason: string) => {
-    const ts = new Date().toISOString();
-    setRequests(prev => {
-      const before = prev.find(r => r.id === requestId);
-      if (!before) return prev;
-      const updated = { ...before, status: SampleStatus.REJECTED, updatedAt: ts };
-      logAction('REJECT', 'AnalysisRequest', requestId, reason, before, updated);
-      return prev.map(r => r.id === requestId ? updated : r);
-    });
-  }, [logAction]);
-
-  const updateStock = useCallback((itemId: string, quantity: number) => {
-    const ts = new Date().toISOString();
-    setInventory(prev => {
-      const before = prev.find(i => i.id === itemId);
-      if (!before) return prev;
-      const updated = { ...before, quantity, updatedAt: ts };
-      logAction('STOCK_ADJUST', 'Inventory', itemId, `Level: ${quantity}`, before, updated);
-      return prev.map(i => i.id === itemId ? updated : i);
-    });
-  }, [logAction]);
-
-  const addInventoryItem = useCallback((itemData: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
-    const ts = new Date().toISOString();
-    const newItem: InventoryItem = { ...itemData, id: generateSecureId('INV'), createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
-    setInventory(prev => [...prev, newItem]);
-    logAction('CREATE', 'Inventory', newItem.id, newItem.name, null, newItem);
-  }, [logAction, user]);
-
-  const addDepartment = useCallback((deptData: Omit<Department, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
-    const ts = new Date().toISOString();
-    const newDept: Department = { ...deptData, id: generateSecureId('DEPT'), createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
-    setDepartments(prev => [...prev, newDept]);
-    logAction('CREATE', 'Department', newDept.id, newDept.name, null, newDept);
-  }, [logAction, user]);
-
-  const addTest = useCallback((deptId: string, test: TestDefinition) => {
-    const ts = new Date().toISOString();
-    setDepartments(prev => prev.map(dept => {
-      if (dept.id === deptId) {
-        const before = { ...dept };
-        const updated = { ...dept, tests: [...dept.tests, test], testCount: dept.testCount + 1, updatedAt: ts };
-        logAction('CONFIG_CHANGE', 'Department', deptId, `Added: ${test.name}`, before, updated);
-        return updated;
-      }
-      return dept;
-    }));
-  }, [logAction]);
-
-  const updateTest = useCallback((deptId: string, updatedTest: TestDefinition) => {
-    const ts = new Date().toISOString();
-    setDepartments(prev => prev.map(dept => {
-      if (dept.id === deptId) {
-        const before = { ...dept };
-        const newTests = dept.tests.map(t => t.code === updatedTest.code ? updatedTest : t);
-        const updated = { ...dept, tests: newTests, updatedAt: ts };
-        logAction('CONFIG_CHANGE', 'Department', deptId, `Updated: ${updatedTest.name}`, before, updated);
-        return updated;
-      }
-      return dept;
-    }));
-  }, [logAction]);
-
-  const deleteTest = useCallback((deptId: string, testCode: string) => {
-    const ts = new Date().toISOString();
-    setDepartments(prev => prev.map(dept => {
-        if (dept.id === deptId) {
-            const before = { ...dept };
-            const newTests = dept.tests.filter(t => t.code !== testCode);
-            const updated = { ...dept, tests: newTests, testCount: Math.max(0, dept.testCount - 1), updatedAt: ts };
-            logAction('CONFIG_CHANGE', 'Department', deptId, `Deleted Test: ${testCode}`, before, updated);
-            return updated;
-        }
-        return dept;
-    }));
-  }, [logAction]);
-
-  const addClient = useCallback((clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
-    const ts = new Date().toISOString();
-    const newClient: Client = { ...clientData, id: generateSecureId('CLIENT'), createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
-    setClients(prev => [...prev, newClient]);
-    logAction('CREATE', 'Client', newClient.id, newClient.name, null, newClient);
-  }, [logAction, user]);
-
-  const updateClient = useCallback((updatedClient: Client) => {
-    const ts = new Date().toISOString();
-    setClients(prev => {
-        const before = prev.find(c => c.id === updatedClient.id);
-        const updated = { ...updatedClient, updatedAt: ts };
-        logAction('UPDATE', 'Client', updated.id, `Updated Info: ${updated.name}`, before, updated);
-        return prev.map(c => c.id === updated.id ? updated : c);
-    });
-  }, [logAction]);
-
+  // Payment Logic
   const recordPayment = useCallback((requestId: string, amount: number) => {
-    // Validate inputs
     if (amount <= 0) {
-        console.error("Invalid payment amount: must be positive.");
+        console.warn("Payment amount must be positive.");
         return;
     }
 
     const ts = new Date().toISOString();
     setRequests(prev => prev.map(req => {
       if (req.id === requestId) {
-        // Prevent overpayment
-        if (amount > req.dueAmount + 0.01) { // small tolerance for float math
-             console.warn("Payment exceeds due amount. Transaction aborted.");
-             return req; 
-        }
+        const netTotal = req.totalFee - req.discount;
+        const remainingBalance = Math.max(0, netTotal - req.paidAmount);
+        
+        // Cap payment at remaining balance to prevent overpayment
+        const paymentToRecord = Math.min(amount, remainingBalance);
+        
+        if (paymentToRecord <= 0) return req;
 
         const before = { ...req };
-        const newPaid = req.paidAmount + amount;
-        const newDue = Math.max(0, (req.totalFee - req.discount) - newPaid);
+        const newPaid = req.paidAmount + paymentToRecord;
+        const newDue = Math.max(0, netTotal - newPaid);
         const updated = { ...req, paidAmount: newPaid, dueAmount: newDue, updatedAt: ts };
-        logAction('FINANCE', 'AnalysisRequest', requestId, `Payment: ${amount}`, before, updated);
+        
+        logAction('FINANCE', 'AnalysisRequest', requestId, `Payment Recorded: ${paymentToRecord}`, before, updated);
         return updated;
       }
       return req;
     }));
   }, [logAction]);
 
-  const createWorksheet = useCallback((wsData: Omit<Worksheet, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
-    const ts = new Date().toISOString();
-    const newWS: Worksheet = { ...wsData, id: generateSecureId('WS'), createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
-    setWorksheets(prev => [newWS, ...prev]);
-    setRequests(prev => prev.map(req => {
-      if (newWS.entries.find(e => e.requestId === req.id)) {
-        return { ...req, status: SampleStatus.IN_LAB, updatedAt: ts };
+  // Clients
+  const addClient = (c: Client) => {
+      const id = `CL-${Date.now()}`;
+      setClients(prev => [...prev, { ...c, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: user?.name || 'Staff' }]);
+      logAction('CREATE', 'Client', id, `Registered client ${c.name}`);
+  };
+  
+  const updateClient = (c: Client) => {
+      setClients(prev => prev.map(cl => cl.id === c.id ? { ...c, updatedAt: new Date().toISOString() } : cl));
+      logAction('UPDATE', 'Client', c.id, `Updated details`);
+  };
+
+  // Departments & Tests
+  const addDepartment = (dept: Department) => {
+      const id = dept.name.toUpperCase().slice(0, 4);
+      setDepartments(prev => [...prev, { ...dept, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: user?.name || 'Admin' }]);
+      logAction('CREATE', 'Department', id, `Added department ${dept.name}`);
+  };
+
+  const addTest = (deptId: string, test: TestDefinition) => {
+      setDepartments(prev => prev.map(d => {
+          if (d.id === deptId) {
+              return { ...d, tests: [...d.tests, test], testCount: d.testCount + 1 };
+          }
+          return d;
+      }));
+      logAction('UPDATE', 'Department', deptId, `Added test ${test.name}`);
+  };
+
+  const updateTest = (deptId: string, test: TestDefinition) => {
+      setDepartments(prev => prev.map(d => {
+          if (d.id === deptId) {
+              return { ...d, tests: d.tests.map(t => t.code === test.code ? test : t) };
+          }
+          return d;
+      }));
+      logAction('UPDATE', 'Department', deptId, `Updated test ${test.code}`);
+  };
+
+  const deleteTest = (deptId: string, code: string) => {
+      setDepartments(prev => prev.map(d => {
+          if (d.id === deptId) {
+              return { ...d, tests: d.tests.filter(t => t.code !== code), testCount: d.testCount - 1 };
+          }
+          return d;
+      }));
+      logAction('UPDATE', 'Department', deptId, `Deleted test ${code}`);
+  };
+
+  // Worksheets
+  const createWorksheet = (ws: Worksheet) => {
+      setWorksheets(prev => [...prev, ws]);
+      logAction('CREATE', 'Worksheet', ws.id, `Created worksheet ${ws.name}`);
+  };
+
+  const closeWorksheet = (id: string) => {
+      setWorksheets(prev => prev.map(ws => ws.id === id ? { ...ws, status: 'Closed' as const } : ws));
+      logAction('UPDATE', 'Worksheet', id, `Closed worksheet`);
+  };
+
+  // Inventory
+  const addInventoryItem = (item: InventoryItem) => {
+      const id = `INV-${Date.now()}`;
+      setInventory(prev => [...prev, { ...item, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: user?.name || 'Staff' }]);
+      logAction('CREATE', 'Inventory', id, `Added item ${item.name}`);
+  };
+
+  const updateStock = (id: string, qty: number) => {
+      setInventory(prev => prev.map(i => i.id === id ? { ...i, quantity: qty } : i));
+      logAction('STOCK_ADJUST', 'Inventory', id, `Adjusted quantity to ${qty}`);
+  };
+
+  // Instruments
+  const addInstrument = (inst: Instrument) => {
+      const id = `INST-${Date.now()}`;
+      setInstruments(prev => [...prev, { ...inst, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: user?.name || 'Admin' }]);
+      logAction('CREATE', 'Instrument', id, `Added instrument ${inst.name}`);
+  };
+
+  const importInstrumentData = (data: any[]) => {
+      let success = 0;
+      let failed = 0;
+      
+      const newRequests = [...requests];
+      
+      data.forEach(row => {
+          const reqIndex = newRequests.findIndex(r => r.id === row.requestId);
+          if (reqIndex >= 0) {
+              const req = newRequests[reqIndex];
+              const analysisIndex = req.analyses.findIndex(a => a.keyword === row.testCode);
+              
+              if (analysisIndex >= 0) {
+                  // Update the specific analysis in the copied request
+                  const updatedAnalyses = [...req.analyses];
+                  updatedAnalyses[analysisIndex] = {
+                      ...updatedAnalyses[analysisIndex],
+                      result: row.result,
+                      status: 'Complete'
+                  };
+                  
+                  newRequests[reqIndex] = {
+                      ...req,
+                      analyses: updatedAnalyses,
+                      status: SampleStatus.TESTING,
+                      updatedAt: new Date().toISOString()
+                  };
+                  success++;
+              } else {
+                  failed++;
+              }
+          } else {
+              failed++;
+          }
+      });
+      
+      if (success > 0) {
+          setRequests(newRequests);
+          logAction('IMPORT', 'System', 'Bulk Import', `Imported ${success} results`);
       }
-      return req;
-    }));
-    logAction('CREATE', 'Worksheet', newWS.id, newWS.departmentId, null, newWS);
-  }, [logAction, user]);
+      
+      return { success, failed };
+  };
 
-  const closeWorksheet = useCallback((id: string) => {
-    const ts = new Date().toISOString();
-    setWorksheets(prev => prev.map(ws => {
-      if (ws.id === id) {
-        const before = { ...ws };
-        const updated = { ...ws, status: 'Closed' as const, updatedAt: ts };
-        logAction('WS_CLOSE', 'Worksheet', id, 'Closed', before, updated);
-        return updated;
-      }
-      return ws;
-    }));
-  }, [logAction]);
+  // Settings
+  const updateSettings = (s: LabSettings) => {
+      setSettingsState(s);
+      logAction('UPDATE', 'Settings', 'Global', 'Updated system settings');
+  };
 
-  const addInstrument = useCallback((instrumentData: Omit<Instrument, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
-    const ts = new Date().toISOString();
-    const newInst: Instrument = { ...instrumentData, id: generateSecureId('INST'), createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
-    setInstruments(prev => [...prev, newInst]);
-    logAction('CREATE', 'Instrument', newInst.id, `Provisioned: ${newInst.name}`, null, newInst);
-  }, [logAction, user]);
+  // Logs
+  const logQC = (instrument: string, result: string, notes: string) => {
+      logAction('QC_RUN', instrument, instrument, `Result: ${result}. ${notes}`);
+  };
 
-  const importInstrumentData = useCallback((data: {requestId: string, testCode: string, result: string}[]) => {
-    let success = 0;
-    let failed = 0;
-    data.forEach(item => {
-      const req = requests.find(r => r.id === item.requestId);
-      if (req && req.analyses.some(a => a.keyword === item.testCode)) {
-        updateAnalysisResult(item.requestId, item.testCode, item.result);
-        success++;
-      } else {
-        failed++;
-      }
-    });
-    if (success > 0) logAction('IMPORT', 'Instrument', 'BATCH', `Imported ${success} results`, null, { success, failed });
-    return { success, failed };
-  }, [requests, updateAnalysisResult, logAction]);
-
-  const addUser = useCallback((userData: Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
-    const ts = new Date().toISOString();
-    const newUser: User = { ...userData, id: generateSecureId('USR'), createdAt: ts, updatedAt: ts, createdBy: user?.name || 'System' };
-    setUsers(prev => [...prev, newUser]);
-    logAction('CREATE', 'User', newUser.id, `Created User: ${newUser.name}`, null, newUser);
-  }, [logAction, user]);
-
-  const updateUserStatus = useCallback((id: string, status: 'Active' | 'Inactive') => {
-    const ts = new Date().toISOString();
-    setUsers(prev => {
-        const before = prev.find(u => u.id === id);
-        const updated = { ...before!, status, updatedAt: ts };
-        logAction('UPDATE', 'User', id, `Status change: ${status}`, before, updated);
-        return prev.map(u => u.id === id ? updated : u);
-    });
-  }, [logAction]);
-
-  const updateSettings = useCallback((newSettings: Partial<LabSettings>) => {
-    setSettings(prev => {
-       const updated = { ...prev, ...newSettings };
-       logAction('CONFIG_CHANGE', 'System', 'Settings', 'Updated Lab Configuration', prev, updated);
-       return updated;
-    });
-  }, [logAction]);
-
-  const logReportGeneration = useCallback((reportType: string, format: string) => {
-    logAction('REPORT_GENERATE', 'Report', reportType, `Generated ${format} report`, null, { format });
-  }, [logAction]);
-
-  const logQC = useCallback((instrument: string, result: string, details: string) => {
-    logAction('QC_RUN', 'Instrument', instrument, `Result: ${result}. ${details}`, null, { result });
-  }, [logAction]);
+  const logReportGeneration = (type: string, format: string) => {
+      logAction('REPORT_GENERATE', 'Report', type, `Generated ${format} report`);
+  };
 
   return (
-    <LabContext.Provider value={{ 
-      user, login, logout,
-      patients, requests, departments, inventory, clients, auditLogs, worksheets, instruments, settings, users,
-      getPatientById, getClientById, getDepartmentById,
-      addPatient, updatePatient, deletePatient,
-      addRequest, updateRequestStatus, updateAnalysisResult, rejectSample,
-      updateStock, addInventoryItem, addDepartment, addTest, updateTest, deleteTest,
-      addClient, updateClient, recordPayment,
-      createWorksheet, closeWorksheet, addInstrument, importInstrumentData, updateSettings,
-      addUser, updateUserStatus, logReportGeneration, logQC
+    <LabContext.Provider value={{
+      user, users, login, logout, addUser, updateUserStatus,
+      patients, addPatient, updatePatient, deletePatient, getPatientById,
+      requests, addRequest, updateAnalysisResult, updateRequestStatus, rejectSample, recordPayment,
+      clients, addClient, updateClient,
+      departments, addDepartment, addTest, updateTest, deleteTest,
+      worksheets, createWorksheet, closeWorksheet,
+      inventory, addInventoryItem, updateStock,
+      instruments, addInstrument, importInstrumentData,
+      settings, updateSettings,
+      auditLogs, logQC, logReportGeneration
     }}>
       {children}
     </LabContext.Provider>
@@ -492,6 +409,8 @@ export const LabProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useLab = () => {
   const context = useContext(LabContext);
-  if (context === undefined) throw new Error('useLab must be used within a LabProvider');
+  if (!context) {
+    throw new Error('useLab must be used within a LabProvider');
+  }
   return context;
 };

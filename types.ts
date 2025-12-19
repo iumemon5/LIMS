@@ -159,7 +159,7 @@ export interface Instrument extends BaseEntity {
 export interface User extends BaseEntity {
   name: string;
   email: string;
-  password?: string; // Optional for security, filled for mock data
+  passwordHash?: string; // Storing hash instead of plaintext
   role: 'Super Admin' | 'Pathologist' | 'Technician' | 'Receptionist';
   status: 'Active' | 'Inactive';
   lastLogin?: string;

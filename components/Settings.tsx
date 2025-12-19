@@ -37,6 +37,7 @@ const Settings: React.FC = () => {
 
   const handleAddUser = (e: React.FormEvent) => {
       e.preventDefault();
+      // The context will handle hashing default password
       addUser(newUser as User);
       setIsUserModalOpen(false);
       setNewUser({ name: '', email: '', role: 'Technician', status: 'Active' });

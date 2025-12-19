@@ -13,6 +13,9 @@ const MOCK_META = {
   createdBy: 'system_init'
 };
 
+// Base64 hash for 'admin123' -> 'YWRtaW4xMjM='
+const DEFAULT_HASH = 'YWRtaW4xMjM=';
+
 export const DEFAULT_SETTINGS: LabSettings = {
   name: 'M-Solutions LIMS',
   address: 'Suite 404, Techno City, Karachi, Pakistan',
@@ -37,7 +40,7 @@ export const DEFAULT_USERS: User[] = [
     id: 'USR-ADMIN-01', 
     name: 'Administrator', 
     email: 'admin@msolutions.pk',
-    password: 'admin123', 
+    passwordHash: DEFAULT_HASH, 
     role: 'Super Admin', 
     status: 'Active', 
     lastLogin: hoursAgo(1), 
@@ -47,7 +50,7 @@ export const DEFAULT_USERS: User[] = [
     id: 'USR-PATH-01', 
     name: 'Dr. Faisal Khan', 
     email: 'faisal@msolutions.pk', 
-    password: 'admin123',
+    passwordHash: DEFAULT_HASH,
     role: 'Pathologist', 
     status: 'Active', 
     lastLogin: daysAgo(1), 
@@ -57,7 +60,7 @@ export const DEFAULT_USERS: User[] = [
     id: 'USR-TECH-01', 
     name: 'Sarah Ahmed', 
     email: 'sarah@msolutions.pk', 
-    password: 'admin123',
+    passwordHash: DEFAULT_HASH,
     role: 'Technician', 
     status: 'Inactive', 
     lastLogin: daysAgo(5), 

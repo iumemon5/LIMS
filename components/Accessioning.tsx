@@ -48,8 +48,12 @@ const Accessioning: React.FC = () => {
 
   // Computed
   const subtotal = selectedTests.reduce((acc, t) => acc + t.price, 0);
-  const total = Math.max(0, subtotal - Number(discount));
-  const balance = Math.max(0, total - Number(amountPaid));
+  const discountVal = Math.max(0, Number(discount));
+  const paidVal = Math.max(0, Number(amountPaid));
+  
+  // Ensure math consistency
+  const total = Math.max(0, subtotal - discountVal);
+  const balance = Math.max(0, total - paidVal);
 
   const filteredTests = useMemo(() => {
     if (!testSearch) return [];
@@ -95,26 +99,27 @@ const Accessioning: React.FC = () => {
     setCreatedRequest(null);
   };
 
+  const handleNonNegativeInput = (setter: (val: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      if (val === '') {
+          setter('');
+          return;
+      }
+      const num = parseFloat(val);
+      if (!isNaN(num) && num >= 0) {
+          setter(val);
+      }
+  };
+
   const handleSave = (shouldPrint: boolean = false) => {
     if (!selectedPatient || selectedTests.length === 0) return;
 
     // Billing Validation
-    const discountVal = Number(discount);
-    const paidVal = Number(amountPaid);
-
-    if (discountVal < 0) {
-        alert("Error: Discount cannot be negative.");
-        return;
-    }
-    if (paidVal < 0) {
-        alert("Error: Payment amount cannot be negative.");
-        return;
-    }
     if (discountVal > subtotal) {
         alert("Error: Discount cannot exceed subtotal amount.");
         return;
     }
-    if (paidVal > (subtotal - discountVal)) {
+    if (paidVal > total) {
         alert("Error: Payment amount cannot exceed the total payable.");
         return;
     }
@@ -549,7 +554,7 @@ const Accessioning: React.FC = () => {
                    min="0"
                    className="w-full text-right bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm font-mono focus:ring-1 focus:ring-blue-500 outline-none text-orange-600 font-medium"
                    value={discount}
-                   onChange={(e) => setDiscount(e.target.value)}
+                   onChange={handleNonNegativeInput(setDiscount)}
                  />
                </div>
              </div>
@@ -578,7 +583,7 @@ const Accessioning: React.FC = () => {
                    min="0"
                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-green-700 focus:ring-2 focus:ring-green-500 outline-none"
                    value={amountPaid}
-                   onChange={(e) => setAmountPaid(e.target.value)}
+                   onChange={handleNonNegativeInput(setAmountPaid)}
                  />
                </div>
              </div>

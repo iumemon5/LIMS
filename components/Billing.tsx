@@ -107,6 +107,18 @@ const Billing: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      if (val === '') {
+          setPaymentAmount('');
+          return;
+      }
+      const num = parseFloat(val);
+      if (!isNaN(num) && num >= 0) {
+          setPaymentAmount(val);
+      }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="flex items-center justify-between">
@@ -351,7 +363,7 @@ const Billing: React.FC = () => {
                                   placeholder="0"
                                   max={selectedInvoice.dueAmount}
                                   value={paymentAmount}
-                                  onChange={e => setPaymentAmount(e.target.value)}
+                                  onChange={handleAmountChange}
                                   required
                                />
                                <div className="flex gap-2 mt-2">
