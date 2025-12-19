@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { TestDefinition, Patient, SampleStatus, Client, AnalysisRequest } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import { normalizeBilling } from '../utils/billing';
 import { Invoice } from './Invoice';
 
 const Accessioning: React.FC = () => {
@@ -48,12 +49,11 @@ const Accessioning: React.FC = () => {
 
   // Computed
   const subtotal = selectedTests.reduce((acc, t) => acc + t.price, 0);
-  const discountVal = Math.max(0, Number(discount));
-  const paidVal = Math.max(0, Number(amountPaid));
-  
-  // Ensure math consistency
-  const total = Math.max(0, subtotal - discountVal);
-  const balance = Math.max(0, total - paidVal);
+  const { discount: discountVal, paid: paidVal, total, balance } = normalizeBilling(
+    subtotal,
+    Number(discount),
+    Number(amountPaid)
+  );
 
   const filteredTests = useMemo(() => {
     if (!testSearch) return [];
