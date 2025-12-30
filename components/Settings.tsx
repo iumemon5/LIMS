@@ -1,17 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Building2, Users, Bell, Lock, Save, 
   Mail, Phone, Globe, Shield, Database,
   ToggleLeft, ToggleRight, CheckCircle2, UserPlus, X,
-  Activity, AlertTriangle
+  Activity, AlertTriangle, Trash2
 } from 'lucide-react';
 import { useLab } from '../contexts/LabContext';
 import { User } from '../types';
 import { formatDateTime } from '../utils/formatters';
 
 const Settings: React.FC = () => {
-  const { settings, updateSettings, users, addUser, updateUserStatus } = useLab();
+  const { settings, updateSettings, users, addUser, updateUserStatus, factoryReset } = useLab();
   const [activeTab, setActiveTab] = useState('general');
   const [localSettings, setLocalSettings] = useState(settings);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -58,6 +57,7 @@ const Settings: React.FC = () => {
     { id: 'users', label: 'User Management', icon: <Users size={18} /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell size={18} /> },
     { id: 'security', label: 'Security & Backup', icon: <Shield size={18} /> },
+    { id: 'data', label: 'Data Management', icon: <Database size={18} /> },
   ];
 
   return (
@@ -290,6 +290,32 @@ const Settings: React.FC = () => {
                     <Save size={18} /> Update Security Settings
                  </button>
               </div>
+           </div>
+        )}
+
+        {activeTab === 'data' && (
+           <div className="p-8 max-w-2xl animate-in fade-in slide-in-from-right-4 duration-300">
+               <h2 className="text-xl font-bold text-slate-900 mb-6">Data Management</h2>
+               <div className="p-6 border border-red-200 bg-red-50 rounded-2xl">
+                   <div className="flex items-start gap-4">
+                       <div className="p-3 bg-red-100 text-red-600 rounded-xl">
+                           <Trash2 size={24} />
+                       </div>
+                       <div className="flex-1">
+                           <h3 className="text-lg font-bold text-red-700">Factory Reset</h3>
+                           <p className="text-sm text-red-600 mt-1 leading-relaxed">
+                               This action will clear all local data, including patients, requests, settings, and users. 
+                               The application will revert to its initial seed state. This action cannot be undone.
+                           </p>
+                           <button 
+                                onClick={factoryReset}
+                                className="mt-4 px-6 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 transition-all active:scale-95"
+                           >
+                               Reset Application Data
+                           </button>
+                       </div>
+                   </div>
+               </div>
            </div>
         )}
       </div>

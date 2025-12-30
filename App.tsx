@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -14,11 +13,22 @@ import Inventory from './components/Inventory';
 import Worksheets from './components/Worksheets';
 import Settings from './components/Settings';
 import Instruments from './components/Instruments';
-import { Settings as SettingsIcon, FlaskConical, Lock, ChevronRight, AlertCircle, Eye, EyeOff, User as UserIcon } from 'lucide-react';
+import { 
+  Settings as SettingsIcon, 
+  FlaskConical, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  User as UserIcon, 
+  ShieldCheck, 
+  CheckCircle2, 
+  AlertCircle,
+  ArrowRight
+} from 'lucide-react';
 import { LabProvider, useLab } from './contexts/LabContext';
 
 const ProtectedApp: React.FC = () => {
-  const { user, login, users } = useLab();
+  const { user, login } = useLab();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [email, setEmail] = useState('admin@msolutions.pk');
   const [password, setPassword] = useState('');
@@ -46,88 +56,172 @@ const ProtectedApp: React.FC = () => {
     };
 
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-         <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-            <div className="h-32 bg-[#005c97] flex flex-col items-center justify-center relative overflow-hidden">
-               <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-               <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white mb-2 shadow-inner">
-                  <FlaskConical size={24} />
-               </div>
-               <h1 className="text-white font-black text-xl tracking-tight italic">M-Solutions LIMS</h1>
-               <p className="text-blue-100 text-xs font-bold uppercase tracking-widest opacity-80">Secure Access Gateway</p>
+      <div className="flex min-h-screen w-full overflow-hidden bg-slate-50 font-sans">
+        {/* Left Pane: Visual & Branding (Hidden on mobile) */}
+        <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-end p-16 overflow-hidden bg-slate-900">
+            {/* Background Image */}
+            <div 
+              className="absolute inset-0 z-0 bg-cover bg-center transition-transform duration-[20s] hover:scale-110" 
+              style={{ 
+                backgroundImage: "url('https://images.unsplash.com/photo-1579165466741-7f35a4755657?auto=format&fit=crop&q=80&w=2000')",
+                opacity: 0.4
+              }}
+            ></div>
+            
+            {/* Overlay Gradient */}
+            <div className="absolute inset-0 z-10 bg-gradient-to-t from-slate-900 via-slate-900/60 to-[#005c97]/30 mix-blend-multiply"></div>
+            <div className="absolute inset-0 z-10 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
+
+            {/* Content */}
+            <div className="relative z-20 max-w-lg animate-in slide-in-from-bottom-8 duration-700">
+                <div className="mb-6 flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-xl">
+                        <FlaskConical size={24} />
+                    </div>
+                    <span className="text-white font-black text-2xl tracking-tight italic">M-Solutions</span>
+                </div>
+                <h1 className="text-white text-5xl font-extrabold leading-tight tracking-tight mb-6">
+                    Precision in every<br/>
+                    <span className="text-blue-400">data point.</span>
+                </h1>
+                <p className="text-slate-300 text-lg leading-relaxed max-w-md font-medium">
+                    Securely manage patient data, automate workflows, and ensure compliance with our AI-powered laboratory information system.
+                </p>
+                <div className="mt-8 flex items-center gap-4 text-sm font-bold text-slate-400">
+                    <div className="flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-500" />
+                        <span>ISO 15189 Compliant</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-500" />
+                        <span>99.9% Uptime</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {/* Right Pane: Login Form */}
+        <div className="w-full lg:w-1/2 flex flex-col relative bg-white overflow-y-auto">
+            {/* Top Bar: Status Chip */}
+            <div className="absolute top-0 right-0 p-6 sm:p-8 flex justify-end w-full z-10">
+                <div className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-emerald-50 pl-3 pr-4 border border-emerald-100 shadow-sm animate-in fade-in duration-1000">
+                    <div className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </div>
+                    <p className="text-emerald-700 text-xs font-bold uppercase tracking-wide">System Operational</p>
+                </div>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col justify-center items-center p-6 sm:p-12 lg:p-24">
+                <div className="w-full max-w-sm space-y-8 animate-in zoom-in-95 duration-500">
+                    {/* Header */}
+                    <div className="space-y-2">
+                        <div className="lg:hidden flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white mb-6 shadow-lg shadow-blue-200">
+                            <FlaskConical size={24} />
+                        </div>
+                        <h2 className="text-slate-900 tracking-tight text-3xl font-black leading-tight">
+                            Sign in to LIMS
+                        </h2>
+                        <p className="text-slate-500 text-base font-medium">
+                            Please enter your credentials to access the workspace.
+                        </p>
+                    </div>
+
+                    {/* Error Message */}
+                    {error && (
+                        <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-600 animate-in slide-in-from-top-2">
+                            <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                            <div className="text-sm font-bold">{error}</div>
+                        </div>
+                    )}
+
+                    {/* Form */}
+                    <form onSubmit={handleLogin} className="space-y-5">
+                        {/* Email Field */}
+                        <div className="space-y-1.5">
+                            <label className="text-slate-700 text-xs font-bold uppercase tracking-wider ml-1">
+                                Employee ID / Email
+                            </label>
+                            <div className="relative group">
+                                <input 
+                                    className="form-input flex w-full rounded-xl text-slate-900 bg-slate-50 border-slate-200 h-12 pl-4 pr-10 text-sm font-bold placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 outline-none" 
+                                    placeholder="e.g. user@labworks.com" 
+                                    type="text"
+                                    value={email}
+                                    onChange={e => setEmail(e.target.value)}
+                                    disabled={isAnimating}
+                                />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors pointer-events-none">
+                                    <UserIcon size={18} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Password Field */}
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between items-center ml-1">
+                                <label className="text-slate-700 text-xs font-bold uppercase tracking-wider">
+                                    Password
+                                </label>
+                                <a href="#" className="text-blue-600 text-xs font-bold hover:text-blue-700 hover:underline transition-colors">
+                                    Forgot Password?
+                                </a>
+                            </div>
+                            <div className="relative group">
+                                <input 
+                                    className="form-input flex w-full rounded-xl text-slate-900 bg-slate-50 border-slate-200 h-12 pl-4 pr-10 text-sm font-bold placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 outline-none" 
+                                    placeholder="••••••••" 
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    disabled={isAnimating}
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors outline-none"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Login Button */}
+                        <button 
+                            disabled={isAnimating}
+                            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all duration-200 flex items-center justify-center gap-2 group active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                        >
+                            {isAnimating ? (
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    <Lock size={16} className="group-hover:scale-110 transition-transform" />
+                                    Secure Login
+                                    <ArrowRight size={16} className="opacity-0 -translate-x-2 group-hover:translate-x-0 group-hover:opacity-100 transition-all" />
+                                </>
+                            )}
+                        </button>
+                    </form>
+
+                    {/* Footer */}
+                    <div className="pt-6 text-center space-y-6">
+                        <p className="text-slate-500 text-sm">
+                            Don't have an account? 
+                            <a href="#" className="text-blue-600 font-bold hover:underline ml-1">Request Access</a>
+                        </p>
+                        <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium bg-slate-50 py-2 rounded-lg">
+                            <ShieldCheck size={14} />
+                            <span>Protected by 256-bit SSL encryption</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             
-            <form onSubmit={handleLogin} className="p-8">
-               <div className="mb-6">
-                  <h2 className="text-xl font-bold text-slate-900">Welcome Back</h2>
-                  <p className="text-slate-500 text-sm">Please sign in to access your laboratory workspace.</p>
-               </div>
-               
-               {error && (
-                 <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-center gap-2 text-sm text-red-600 font-bold animate-in slide-in-from-top-2">
-                    <AlertCircle size={16} />
-                    {error}
-                 </div>
-               )}
-
-               <div className="space-y-4">
-                  <div className="space-y-1">
-                     <label className="text-xs font-black text-slate-500 uppercase">Email Address</label>
-                     <div className="relative">
-                        <input 
-                           type="email"
-                           className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-[#005c97] outline-none"
-                           value={email}
-                           onChange={e => setEmail(e.target.value)}
-                           placeholder="user@example.com"
-                        />
-                        <UserIcon className="absolute left-3 top-3.5 text-slate-400" size={16} />
-                     </div>
-                  </div>
-
-                  <div className="space-y-1">
-                     <div className="flex justify-between">
-                        <label className="text-xs font-black text-slate-500 uppercase">Password</label>
-                        <span className="text-[10px] text-slate-400">Hint: admin123</span>
-                     </div>
-                     <div className="relative">
-                        <input 
-                           type={showPassword ? 'text' : 'password'}
-                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-[#005c97] outline-none"
-                           value={password}
-                           onChange={e => setPassword(e.target.value)}
-                           placeholder="Enter your password"
-                        />
-                        <button 
-                           type="button"
-                           onClick={() => setShowPassword(!showPassword)}
-                           className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600"
-                        >
-                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                     </div>
-                  </div>
-
-                  <button 
-                     disabled={isAnimating}
-                     className="w-full bg-[#005c97] hover:bg-blue-800 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                     {isAnimating ? (
-                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                     ) : (
-                        <>
-                           <Lock size={16} /> Secure Login
-                        </>
-                     )}
-                  </button>
-               </div>
-
-               <div className="mt-8 text-center">
-                  <p className="text-xs text-slate-400 font-medium">Protected by ISO 27001 Security Standards.</p>
-                  <p className="text-[10px] text-slate-300 mt-1">v1.0.1 (Build 2025.11)</p>
-               </div>
-            </form>
-         </div>
+            {/* Mobile Footer Gradient */}
+            <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-600 lg:hidden"></div>
+        </div>
       </div>
     );
   }

@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Sparkles, Send, Loader2 } from 'lucide-react';
+import { Sparkles, ArrowUp, Loader2 } from 'lucide-react';
 import { getLabIntelligence } from '../services/geminiService';
 import { useLab } from '../contexts/LabContext';
 
@@ -31,13 +30,16 @@ const LabInsights: React.FC = () => {
     setLoading(false);
   };
 
-  // Simple Markdown Parser to avoid heavy dependencies
+  const handleChipClick = (text: string) => {
+      setQuery(text);
+      // Optional: Auto submit or let user click send
+  };
+
+  // Simple Markdown Parser
   const renderFormattedText = (text: string) => {
     return text.split('\n').map((line, lineIndex) => {
       const isList = line.trim().startsWith('* ') || line.trim().startsWith('- ');
       const cleanLine = isList ? line.trim().substring(2) : line;
-      
-      // Parse Bold (**text**)
       const parts = cleanLine.split(/(\*\*.*?\*\*)/g);
       
       const content = parts.map((part, partIndex) => {
@@ -55,55 +57,66 @@ const LabInsights: React.FC = () => {
           </div>
         );
       }
-
-      return (
-        <p key={lineIndex} className={`text-sm text-slate-700 leading-relaxed ${line.trim() === '' ? 'h-2' : 'mb-2'}`}>
-          {content}
-        </p>
-      );
+      return <p key={lineIndex} className={`text-sm text-slate-700 leading-relaxed ${line.trim() === '' ? 'h-2' : 'mb-2'}`}>{content}</p>;
     });
   };
 
   return (
-    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="text-indigo-600" size={20} />
-        <h2 className="text-lg font-bold text-indigo-900">Lab Intelligence Assistant</h2>
+    <div className="bg-indigo-50/50 p-6 rounded-xl border border-indigo-100 shadow-sm flex flex-col h-[300px]">
+      <div className="flex items-center gap-2 mb-3 text-indigo-700">
+        <div className="p-1 bg-indigo-100 rounded">
+          <Sparkles size={16} />
+        </div>
+        <h3 className="text-sm font-bold uppercase tracking-wide">Lab Intelligence Assistant</h3>
       </div>
       
-      <p className="text-sm text-indigo-700 mb-6">
-        Ask about laboratory performance, sample bottlenecks, or general trends. 
-        <span className="block mt-1 font-medium italic italic text-indigo-800">"What is the current status of my highest priority samples?"</span>
-      </p>
-
-      <form onSubmit={handleAsk} className="relative mb-4">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Type your question here..."
-          className="w-full bg-white border border-indigo-200 rounded-xl py-3 pl-4 pr-12 text-sm focus:ring-2 focus:ring-indigo-500 outline-none shadow-inner"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md"
-        >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-        </button>
-      </form>
-
-      {answer && (
-        <div className="bg-white border border-indigo-100 rounded-xl p-6 animate-in fade-in slide-in-from-top-4 duration-300 shadow-sm">
-          <div className="flex gap-4">
-            <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-sm mt-1">
-              <Sparkles size={16} />
+      {!answer ? (
+        <>
+            <div className="space-y-2 mb-6">
+                <p className="text-sm text-slate-600">Ask specific questions to generate reports or find bottlenecks.</p>
             </div>
-            <div className="flex-1">
-              {renderFormattedText(answer)}
+            
+            <form onSubmit={handleAsk} className="relative group mb-4">
+                <input
+                aria-label="Ask Lab Intelligence"
+                className="w-full h-12 pl-4 pr-14 rounded-lg border border-indigo-200 bg-white shadow-sm text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                placeholder="E.g., 'Show me overdue haematology samples'"
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                />
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  aria-label="Send Query" 
+                  className="absolute right-1.5 top-1.5 bottom-1.5 aspect-square bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 flex items-center justify-center disabled:opacity-70"
+                >
+                  {loading ? <Loader2 size={18} className="animate-spin"/> : <ArrowUp size={20} />}
+                </button>
+            </form>
+
+            <div className="flex gap-2 mt-auto flex-wrap">
+                <button type="button" onClick={() => handleChipClick("Revenue today?")} className="text-xs bg-white border border-indigo-100 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-50 hover:border-indigo-200 transition-colors font-medium">
+                    Revenue today?
+                </button>
+                <button type="button" onClick={() => handleChipClick("Pending Validations")} className="text-xs bg-white border border-indigo-100 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-50 hover:border-indigo-200 transition-colors font-medium">
+                    Pending Validations
+                </button>
+                <button type="button" onClick={() => handleChipClick("Critical alerts log")} className="text-xs bg-white border border-indigo-100 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-50 hover:border-indigo-200 transition-colors font-medium">
+                    Critical alerts log
+                </button>
             </div>
+        </>
+      ) : (
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+             <div className="bg-white border border-indigo-100 rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex justify-between items-start mb-2">
+                    <span className="text-xs font-bold text-indigo-500 uppercase">AI Response</span>
+                    <button onClick={() => setAnswer(null)} className="text-xs font-bold text-slate-400 hover:text-indigo-600">New Search</button>
+                </div>
+                {renderFormattedText(answer)}
+             </div>
           </div>
-        </div>
       )}
     </div>
   );

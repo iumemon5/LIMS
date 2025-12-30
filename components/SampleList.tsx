@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useLab } from '../contexts/LabContext';
 import { SampleStatus, AnalysisRequest } from '../types';
 import { detectAnomalies } from '../services/geminiService';
@@ -7,12 +6,15 @@ import { formatDate } from '../utils/formatters';
 import { 
   MoreVertical, Filter, Download, ExternalLink, Microscope, 
   FlaskConical, X, Save, CheckCircle2, Sparkles, AlertTriangle, Printer,
-  Ban, Clock, FileCheck
+  Ban, Clock, FileCheck, RotateCcw, Edit2
 } from 'lucide-react';
 
 const SampleList: React.FC = () => {
-  const { requests, clients, updateAnalysisResult, updateRequestStatus, rejectSample, patients, settings } = useLab();
-  const [selectedRequest, setSelectedRequest] = useState<AnalysisRequest | null>(null);
+  const { requests, clients, updateAnalysisResult, updateRequestStatus, rejectSample, resetSampleStatus, patients, settings } = useLab();
+  
+  // Refactor: Use ID instead of object copy to keep UI in sync with Context updates
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+  const selectedRequest = useMemo(() => requests.find(r => r.id === selectedRequestId) || null, [requests, selectedRequestId]);
   
   // Rejection State
   const [rejectingRequest, setRejectingRequest] = useState<AnalysisRequest | null>(null);
@@ -78,18 +80,14 @@ const SampleList: React.FC = () => {
   const handleResultChange = (keyword: string, val: string) => {
     if (selectedRequest) {
       updateAnalysisResult(selectedRequest.id, keyword, val);
-      // Update local state
-      setSelectedRequest(prev => prev ? ({
-        ...prev,
-        analyses: prev.analyses.map(a => a.keyword === keyword ? { ...a, result: val, status: 'Complete' } : a)
-      }) : null);
+      // No local state update needed, Context update will trigger re-render via selectedRequest useMemo
     }
   };
 
   const finalizeResults = () => {
     if (selectedRequest) {
         updateRequestStatus(selectedRequest.id, SampleStatus.VERIFIED);
-        setSelectedRequest(null);
+        setSelectedRequestId(null);
         setAiAnalysisResult(null);
     }
   };
@@ -99,6 +97,13 @@ const SampleList: React.FC = () => {
           rejectSample(rejectingRequest.id, rejectionReason);
           setRejectingRequest(null);
           setRejectionReason('');
+      }
+  };
+
+  const handleRestore = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      if (window.confirm('Are you sure you want to restore this rejected sample? It will move back to the Received queue.')) {
+          resetSampleStatus(id);
       }
   };
 
@@ -264,18 +269,34 @@ const SampleList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 flex items-center gap-2">
                         {req.status === SampleStatus.VERIFIED || req.status === SampleStatus.PUBLISHED ? (
-                            <button 
-                                onClick={() => setReportToPrint(req)}
-                                className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold border border-slate-200"
-                            >
-                                <Printer size={16} /> Print
-                            </button>
+                            <>
+                                <button 
+                                    onClick={() => setReportToPrint(req)}
+                                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold border border-slate-200"
+                                    title="Print Report"
+                                >
+                                    <Printer size={16} /> Print
+                                </button>
+                                <button 
+                                    onClick={() => setSelectedRequestId(req.id)}
+                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
+                                    title="Edit Result (Will revert to Testing)"
+                                >
+                                    <Edit2 size={16} />
+                                </button>
+                            </>
                         ) : req.status === SampleStatus.REJECTED ? (
-                            <span className="text-xs text-red-500 font-bold italic">Rejected</span>
+                            <button 
+                                onClick={(e) => handleRestore(e, req.id)}
+                                className="flex items-center gap-1 p-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-xs font-bold"
+                                title="Undo Rejection"
+                            >
+                                <RotateCcw size={14} /> Restore
+                            </button>
                         ) : (
                             <>
                                 <button 
-                                    onClick={() => setSelectedRequest(req)}
+                                    onClick={() => setSelectedRequestId(req.id)}
                                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
                                     title="Enter Results"
                                 >
@@ -360,7 +381,7 @@ const SampleList: React.FC = () => {
                     </p>
                   </div>
                </div>
-               <button onClick={() => { setSelectedRequest(null); setAiAnalysisResult(null); }} className="text-slate-400 hover:text-red-500 transition-colors">
+               <button onClick={() => { setSelectedRequestId(null); setAiAnalysisResult(null); }} className="text-slate-400 hover:text-red-500 transition-colors">
                  <X size={24} />
                </button>
              </div>
@@ -378,6 +399,12 @@ const SampleList: React.FC = () => {
                    <div>
                       <div className="text-xs font-bold text-slate-500 uppercase">Referrer</div>
                       <div className="font-bold text-slate-900">{selectedRequest.referrer}</div>
+                   </div>
+                   <div>
+                      <div className="text-xs font-bold text-slate-500 uppercase">Current Status</div>
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${getStatusColor(selectedRequest.status)}`}>
+                         {selectedRequest.status}
+                      </span>
                    </div>
                 </div>
 
@@ -404,7 +431,7 @@ const SampleList: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {selectedRequest.analyses.map((test) => (
+                        {selectedRequest.analyses.map((test, i) => (
                           <tr key={test.keyword} className="hover:bg-slate-50/50">
                             <td className="py-4 pl-2">
                                <div className="font-bold text-slate-900">{test.title}</div>
@@ -412,8 +439,8 @@ const SampleList: React.FC = () => {
                             </td>
                             <td className="py-4">
                                <input 
-                                 autoFocus
-                                 className="border border-slate-300 rounded-lg px-3 py-2 w-32 font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                 autoFocus={i === 0}
+                                 className="border border-slate-200 bg-white rounded-lg px-3 py-2 w-full max-w-[160px] font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
                                  value={test.result || ''}
                                  onChange={(e) => handleResultChange(test.keyword, e.target.value)}
                                  placeholder="--"
@@ -452,14 +479,14 @@ const SampleList: React.FC = () => {
                    </button>
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => { setSelectedRequest(null); setAiAnalysisResult(null); }} className="px-6 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-100">
+                  <button onClick={() => { setSelectedRequestId(null); setAiAnalysisResult(null); }} className="px-6 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-100">
                     Close
                   </button>
                   <button 
                     onClick={finalizeResults}
                     className="px-6 py-2.5 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 shadow-lg shadow-green-200 flex items-center gap-2"
                   >
-                    <Save size={18} /> Verify & Submit
+                    <Save size={18} /> {selectedRequest.status === SampleStatus.VERIFIED ? 'Save Changes' : 'Verify & Submit'}
                   </button>
                 </div>
              </div>

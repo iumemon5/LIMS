@@ -1,19 +1,17 @@
-
 import React, { useState, useMemo } from 'react';
 import { useLab } from '../contexts/LabContext';
 import { 
   Search, Plus, Trash2, User, Calendar, 
   CreditCard, Save, Printer, ChevronRight, 
   Stethoscope, Phone, AlertCircle, X, CheckCircle2,
-  Building2, Beaker, UserPlus
+  Building2, Beaker, UserPlus, Wallet
 } from 'lucide-react';
 import { TestDefinition, Patient, SampleStatus, Client, AnalysisRequest } from '../types';
 import { formatCurrency } from '../utils/formatters';
-import { normalizeBilling } from '../utils/billing';
 import { Invoice } from './Invoice';
 
 const Accessioning: React.FC = () => {
-  const { patients, departments, clients, addRequest, addPatient, settings, getPatientById } = useLab();
+  const { patients, departments, addRequest, addPatient, settings, getPatientById, requests } = useLab();
   
   // State
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -23,7 +21,6 @@ const Accessioning: React.FC = () => {
   const [selectedTests, setSelectedTests] = useState<TestDefinition[]>([]);
   
   // New Fields
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null); // Default to null (Walk-in)
   const [sampleType, setSampleType] = useState<string>('Blood');
   const [referrer, setReferrer] = useState<string>('Self');
   const [priority, setPriority] = useState<string>('Normal');
@@ -49,11 +46,20 @@ const Accessioning: React.FC = () => {
 
   // Computed
   const subtotal = selectedTests.reduce((acc, t) => acc + t.price, 0);
-  const { discount: discountVal, paid: paidVal, total, balance } = normalizeBilling(
-    subtotal,
-    Number(discount),
-    Number(amountPaid)
-  );
+  const discountVal = Math.max(0, Number(discount));
+  const paidVal = Math.max(0, Number(amountPaid));
+  
+  // Ensure math consistency
+  const total = Math.max(0, subtotal - discountVal);
+  const balance = Math.max(0, total - paidVal);
+
+  // Calculate Previous Dues for Selected Patient
+  const previousDues = useMemo(() => {
+    if (!selectedPatient) return 0;
+    return requests
+      .filter(r => r.patientId === selectedPatient.id && r.dueAmount > 0)
+      .reduce((sum, r) => sum + r.dueAmount, 0);
+  }, [selectedPatient, requests]);
 
   const filteredTests = useMemo(() => {
     if (!testSearch) return [];
@@ -87,7 +93,6 @@ const Accessioning: React.FC = () => {
 
   const handleReset = () => {
     setSelectedPatient(null);
-    setSelectedClient(null);
     setSelectedTests([]);
     setDiscount('0');
     setAmountPaid('0');
@@ -112,7 +117,15 @@ const Accessioning: React.FC = () => {
   };
 
   const handleSave = (shouldPrint: boolean = false) => {
-    if (!selectedPatient || selectedTests.length === 0) return;
+    if (!selectedPatient) {
+        alert("Please select a patient to proceed.");
+        return;
+    }
+    
+    if (selectedTests.length === 0) {
+        alert("Please select at least one test.");
+        return;
+    }
 
     // Billing Validation
     if (discountVal > subtotal) {
@@ -125,7 +138,7 @@ const Accessioning: React.FC = () => {
     }
 
     const newRequestData = {
-      clientId: selectedClient?.id || 'WALK-IN',
+      clientId: 'DIRECT', // Default to Direct/Walk-in
       patientId: selectedPatient.id,
       sampleType: sampleType,
       status: SampleStatus.RECEIVED,
@@ -345,35 +358,53 @@ const Accessioning: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100 flex justify-between items-center group">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-blue-600 font-bold border border-blue-100 shadow-sm">
-                  {selectedPatient.firstName[0]}
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900">
-                    {selectedPatient.title} {selectedPatient.firstName} {selectedPatient.lastName}
-                  </h3>
-                  <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                    <span className="flex items-center gap-1"><User size={12} /> {selectedPatient.gender}, {selectedPatient.age} {selectedPatient.ageUnit}</span>
-                    <span className="flex items-center gap-1"><Phone size={12} /> {selectedPatient.contact}</span>
-                    {selectedPatient.relationName && (
-                        <span className="text-slate-400">| {selectedPatient.relationType} {selectedPatient.relationName}</span>
-                    )}
+            <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100 relative group overflow-hidden">
+              <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-blue-600 font-bold border border-blue-100 shadow-sm">
+                      {selectedPatient.firstName[0]}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900">
+                        {selectedPatient.title} {selectedPatient.firstName} {selectedPatient.lastName}
+                      </h3>
+                      <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                        <span className="flex items-center gap-1"><User size={12} /> {selectedPatient.gender}, {selectedPatient.age} {selectedPatient.ageUnit}</span>
+                        <span className="flex items-center gap-1"><Phone size={12} /> {selectedPatient.contact}</span>
+                        {selectedPatient.relationName && (
+                            <span className="text-slate-400">| {selectedPatient.relationType} {selectedPatient.relationName}</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                  <button 
+                    onClick={() => setSelectedPatient(null)}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all"
+                  >
+                    <X size={18} />
+                  </button>
               </div>
-              <button 
-                onClick={() => setSelectedPatient(null)}
-                className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all"
-              >
-                <X size={18} />
-              </button>
+              
+              {/* Previous Dues Alert */}
+              {previousDues > 0 && (
+                  <div className="mt-4 flex items-center gap-3 bg-red-100 border border-red-200 rounded-lg p-3 text-red-800 animate-in fade-in slide-in-from-top-1">
+                      <div className="p-1.5 bg-red-200 rounded-full text-red-700">
+                          <Wallet size={16} />
+                      </div>
+                      <div className="flex-1">
+                          <p className="text-xs font-bold uppercase tracking-wide opacity-80">Outstanding Balance</p>
+                          <p className="font-black text-lg">{formatCurrency(previousDues)}</p>
+                      </div>
+                      <div className="text-xs font-bold text-red-700 bg-white/50 px-2 py-1 rounded">
+                         Collect Dues
+                      </div>
+                  </div>
+              )}
             </div>
           )}
 
-          {/* Clinical Info Inputs (Only visible when patient selected) */}
-          <div className={`grid grid-cols-2 gap-4 mt-4 transition-all duration-300 ${selectedPatient ? 'opacity-100' : 'opacity-50 pointer-events-none grayscale'}`}>
+          {/* Clinical Info Inputs */}
+          <div className="grid grid-cols-2 gap-4 mt-4 transition-all duration-300">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">Referrer / Doctor</label>
               <div className="relative">
@@ -386,23 +417,7 @@ const Accessioning: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1">Client (Payer)</label>
-              <div className="relative">
-                <Building2 size={14} className="absolute left-3 top-3 text-slate-400" />
-                <select 
-                  className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
-                  onChange={e => {
-                    const client = clients.find(c => c.id === e.target.value);
-                    setSelectedClient(client || null);
-                  }}
-                  value={selectedClient?.id || ''}
-                >
-                  <option value="">Walk-in / Private</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-            </div>
+            
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">Priority Level</label>
               <div className="relative">
@@ -418,7 +433,7 @@ const Accessioning: React.FC = () => {
                 </select>
               </div>
             </div>
-             <div className="space-y-1">
+             <div className="space-y-1 col-span-2">
               <label className="text-xs font-semibold text-slate-500 ml-1">Sample Type</label>
               <div className="relative">
                 <Beaker size={14} className="absolute left-3 top-3 text-slate-400" />
@@ -601,8 +616,8 @@ const Accessioning: React.FC = () => {
         <div className="p-6 bg-slate-50 border-t border-slate-200 space-y-3">
           <button 
             onClick={() => handleSave(false)}
-            disabled={!selectedPatient || selectedTests.length === 0}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2 font-bold transition-all active:scale-[0.98]"
+            // Disabled condition removed, validation moved to handleSave
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2 font-bold transition-all active:scale-[0.98]"
           >
              <Save size={20} />
              <span>Confirm & Generate Bill</span>
@@ -611,8 +626,7 @@ const Accessioning: React.FC = () => {
           <div className="grid grid-cols-2 gap-3">
              <button 
                 onClick={() => handleSave(true)}
-                disabled={!selectedPatient || selectedTests.length === 0}
-                className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-bold hover:bg-slate-50 text-xs disabled:opacity-50"
+                className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-bold hover:bg-slate-50 text-xs"
              >
                <Printer size={16} /> Save & Print
              </button>

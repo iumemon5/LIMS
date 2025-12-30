@@ -1,16 +1,41 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   User, Patient, AnalysisRequest, Department, Client, 
   InventoryItem, Worksheet, Instrument, AuditLog, LabSettings,
-  SampleStatus, TestDefinition
+  SampleStatus, TestDefinition, BaseEntity
 } from '../types';
 import { 
   DEFAULT_USERS, PATIENTS, MOCK_REQUESTS, DEPARTMENTS, 
   CLIENTS, DEFAULT_SETTINGS, AUDIT_LOGS 
 } from '../constants';
-import { computeRequestStatus } from '../utils/analysis';
-import { applyPayment } from '../utils/billing';
+
+// --- Persistence Helper ---
+function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [value, setValue] = useState<T>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stickyValue = window.localStorage.getItem(key);
+        return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
+      } catch (error) {
+        console.warn(`Error reading ${key} from localStorage`, error);
+        return defaultValue;
+      }
+    }
+    return defaultValue;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(value));
+      } catch (error) {
+        console.warn(`Error saving ${key} to localStorage`, error);
+      }
+    }
+  }, [key, value]);
+
+  return [value, setValue];
+}
 
 interface LabContextType {
   user: User | null;
@@ -30,6 +55,7 @@ interface LabContextType {
   addRequest: (req: Partial<AnalysisRequest>) => string;
   updateAnalysisResult: (reqId: string, keyword: string, value: string) => void;
   updateRequestStatus: (reqId: string, status: SampleStatus) => void;
+  resetSampleStatus: (reqId: string) => void;
   rejectSample: (reqId: string, reason: string) => void;
   recordPayment: (reqId: string, amount: number) => void;
   
@@ -38,7 +64,7 @@ interface LabContextType {
   updateClient: (client: Client) => void;
   
   departments: Department[];
-  addDepartment: (dept: Department) => void;
+  addDepartment: (dept: Omit<Department, keyof BaseEntity>) => void;
   addTest: (deptId: string, test: TestDefinition) => void;
   updateTest: (deptId: string, test: TestDefinition) => void;
   deleteTest: (deptId: string, code: string) => void;
@@ -61,26 +87,40 @@ interface LabContextType {
   auditLogs: AuditLog[];
   logQC: (instrument: string, result: string, notes: string) => void;
   logReportGeneration: (type: string, format: string) => void;
+  
+  factoryReset: () => void;
 }
 
 const LabContext = createContext<LabContextType | undefined>(undefined);
 
 export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(DEFAULT_USERS);
-  const [patients, setPatients] = useState<Patient[]>(PATIENTS);
-  const [requests, setRequests] = useState<AnalysisRequest[]>(MOCK_REQUESTS);
-  const [clients, setClients] = useState<Client[]>(CLIENTS);
-  const [departments, setDepartments] = useState<Department[]>(DEPARTMENTS);
-  const [worksheets, setWorksheets] = useState<Worksheet[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([
+  // Use sticky state for persistence
+  const [user, setUser] = useStickyState<User | null>(null, 'lims_current_user');
+  const [users, setUsers] = useStickyState<User[]>(DEFAULT_USERS, 'lims_users');
+  const [patients, setPatients] = useStickyState<Patient[]>(PATIENTS, 'lims_patients');
+  const [requests, setRequests] = useStickyState<AnalysisRequest[]>(MOCK_REQUESTS, 'lims_requests');
+  const [clients, setClients] = useStickyState<Client[]>(CLIENTS, 'lims_clients');
+  const [departments, setDepartments] = useStickyState<Department[]>(DEPARTMENTS, 'lims_departments');
+  const [worksheets, setWorksheets] = useStickyState<Worksheet[]>([], 'lims_worksheets');
+  
+  const [inventory, setInventory] = useStickyState<InventoryItem[]>([
       { id: 'INV-001', name: 'Glucose Reagent', category: 'Reagent', lotNumber: 'LOT-GLU-24', expiryDate: '2025-12-31', quantity: 15, unit: 'Kits', minLevel: 5, location: 'Fridge A', createdAt: '', updatedAt: '', createdBy: 'system' }
-  ]);
-  const [instruments, setInstruments] = useState<Instrument[]>([
+  ], 'lims_inventory');
+  
+  const [instruments, setInstruments] = useStickyState<Instrument[]>([
       { id: 'INST-001', name: 'Cobas c311', type: 'Chemistry Analyzer', protocol: 'HL7', ipAddress: '192.168.1.50', status: 'Online', createdAt: '', updatedAt: '', createdBy: 'system' }
-  ]);
-  const [settings, setSettingsState] = useState<LabSettings>(DEFAULT_SETTINGS);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(AUDIT_LOGS);
+  ], 'lims_instruments');
+  
+  const [settings, setSettingsState] = useStickyState<LabSettings>(DEFAULT_SETTINGS, 'lims_settings');
+  const [auditLogs, setAuditLogs] = useStickyState<AuditLog[]>(AUDIT_LOGS, 'lims_audit_logs');
+
+  // Factory Reset
+  const factoryReset = useCallback(() => {
+    if (window.confirm("Are you sure? This will wipe all local data and restore defaults.")) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  }, []);
 
   const logAction = useCallback((action: string, resourceType: string, resourceId: string, details: string, before?: any, after?: any) => {
     const newLog: AuditLog = {
@@ -96,7 +136,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         after: after ? JSON.stringify(after) : undefined
     };
     setAuditLogs(prev => [newLog, ...prev]);
-  }, [user]);
+  }, [user, setAuditLogs]);
 
   // User Auth with Mock Hashing
   const login = (email: string, pass: string) => {
@@ -130,7 +170,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updatedAt: new Date().toISOString(), 
           createdBy: user?.name || 'Admin' 
       };
-      setUsers([...users, newUser]);
+      setUsers(prev => [...prev, newUser]);
       logAction('CREATE', 'User', newUser.id, `Created user ${u.name}`);
   };
 
@@ -184,11 +224,24 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateAnalysisResult = (reqId: string, keyword: string, value: string) => {
       setRequests(prev => prev.map(req => {
           if (req.id === reqId) {
-              const updatedAnalyses = req.analyses.map(a => 
-                  a.keyword === keyword ? { ...a, result: value, status: 'Complete' as const } : a
-              );
+              const status = value && value.trim() !== '' ? 'Complete' : 'Pending';
 
-              const newStatus = computeRequestStatus(req.status, updatedAnalyses);
+              const updatedAnalyses = req.analyses.map(a => 
+                  a.keyword === keyword ? { ...a, result: value, status: status as 'Pending' | 'Complete' | 'Flagged' } : a
+              );
+              
+              let newStatus = req.status;
+
+              // 1. Auto-start: If status is "Received", "Collected" or "In Lab", result entry moves it to "Testing"
+              if ([SampleStatus.RECEIVED, SampleStatus.COLLECTED, SampleStatus.IN_LAB].includes(req.status)) {
+                  newStatus = SampleStatus.TESTING;
+              }
+
+              // 2. Auto-Revert: Any change to results of a Verified request downgrades it to Testing to ensure re-verification.
+              if (req.status === SampleStatus.VERIFIED) {
+                  newStatus = SampleStatus.TESTING;
+              }
+              
               return { ...req, analyses: updatedAnalyses, status: newStatus, updatedAt: new Date().toISOString() };
           }
           return req;
@@ -198,6 +251,11 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateRequestStatus = (reqId: string, status: SampleStatus) => {
       setRequests(prev => prev.map(req => req.id === reqId ? { ...req, status, updatedAt: new Date().toISOString() } : req));
       logAction('UPDATE', 'AnalysisRequest', reqId, `Status changed to ${status}`);
+  };
+
+  const resetSampleStatus = (reqId: string) => {
+      setRequests(prev => prev.map(req => req.id === reqId ? { ...req, status: SampleStatus.RECEIVED, updatedAt: new Date().toISOString() } : req));
+      logAction('RESET', 'AnalysisRequest', reqId, `Status reset to Received`);
   };
 
   const rejectSample = (reqId: string, reason: string) => {
@@ -216,19 +274,24 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRequests(prev => prev.map(req => {
       if (req.id === requestId) {
         const netTotal = req.totalFee - req.discount;
-        const { applied, newPaid, newDue } = applyPayment(req.paidAmount, netTotal, amount);
-
-        if (applied <= 0) return req;
+        const remainingBalance = Math.max(0, netTotal - req.paidAmount);
+        
+        // Cap payment at remaining balance to prevent overpayment
+        const paymentToRecord = Math.min(amount, remainingBalance);
+        
+        if (paymentToRecord <= 0) return req;
 
         const before = { ...req };
+        const newPaid = req.paidAmount + paymentToRecord;
+        const newDue = Math.max(0, netTotal - newPaid);
         const updated = { ...req, paidAmount: newPaid, dueAmount: newDue, updatedAt: ts };
         
-        logAction('FINANCE', 'AnalysisRequest', requestId, `Payment Recorded: ${applied}`, before, updated);
+        logAction('FINANCE', 'AnalysisRequest', requestId, `Payment Recorded: ${paymentToRecord}`, before, updated);
         return updated;
       }
       return req;
     }));
-  }, [logAction]);
+  }, [logAction, setRequests]);
 
   // Clients
   const addClient = (c: Client) => {
@@ -243,7 +306,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Departments & Tests
-  const addDepartment = (dept: Department) => {
+  const addDepartment = (dept: Omit<Department, keyof BaseEntity>) => {
       const id = dept.name.toUpperCase().slice(0, 4);
       setDepartments(prev => [...prev, { ...dept, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: user?.name || 'Admin' }]);
       logAction('CREATE', 'Department', id, `Added department ${dept.name}`);
@@ -329,11 +392,14 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                       result: row.result,
                       status: 'Complete'
                   };
+
+                  // Check for Auto-Verification Eligibility
+                  const newStatus = SampleStatus.TESTING;
                   
                   newRequests[reqIndex] = {
                       ...req,
                       analyses: updatedAnalyses,
-                      status: SampleStatus.TESTING,
+                      status: newStatus,
                       updatedAt: new Date().toISOString()
                   };
                   success++;
@@ -372,14 +438,15 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <LabContext.Provider value={{
       user, users, login, logout, addUser, updateUserStatus,
       patients, addPatient, updatePatient, deletePatient, getPatientById,
-      requests, addRequest, updateAnalysisResult, updateRequestStatus, rejectSample, recordPayment,
+      requests, addRequest, updateAnalysisResult, updateRequestStatus, resetSampleStatus, rejectSample, recordPayment,
       clients, addClient, updateClient,
       departments, addDepartment, addTest, updateTest, deleteTest,
       worksheets, createWorksheet, closeWorksheet,
       inventory, addInventoryItem, updateStock,
       instruments, addInstrument, importInstrumentData,
       settings, updateSettings,
-      auditLogs, logQC, logReportGeneration
+      auditLogs, logQC, logReportGeneration,
+      factoryReset
     }}>
       {children}
     </LabContext.Provider>
