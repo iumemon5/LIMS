@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { AnalysisRequest, Patient, LabSettings } from '../types';
 import { formatDate, formatCurrency } from '../utils/formatters';
@@ -23,7 +22,7 @@ export const Invoice: React.FC<InvoiceProps> = ({ request, patient, settings, on
              </div>
           </div>
 
-          <div className="p-10 print:px-12 print:py-8 bg-white min-h-[500px] print:min-h-0">
+          <div className="p-10 print:px-8 print:py-6 bg-white min-h-[500px] print:min-h-0">
             {/* Header */}
             <div className="text-center border-b-2 border-slate-900 pb-4 mb-6">
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">{settings.name}</h1>

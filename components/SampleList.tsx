@@ -511,7 +511,7 @@ const SampleList: React.FC = () => {
 
               {/* A4 Paper Canvas */}
               <div className="flex-1 overflow-y-auto bg-slate-100 p-8 print:p-0 print:bg-white print:overflow-visible">
-                 <div className="bg-white w-full min-h-full shadow-lg p-12 mx-auto print:shadow-none print:w-full print:mx-0 print:p-12">
+                 <div className="bg-white w-full min-h-full shadow-lg p-12 mx-auto print:shadow-none print:w-full print:mx-0 print:px-8 print:py-6">
                     
                     {/* Report Header */}
                     <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">

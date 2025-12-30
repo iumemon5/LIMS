@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useLab } from '../contexts/LabContext';
 import { 
   Search, Plus, Trash2, User, Calendar, 
@@ -11,7 +11,7 @@ import { formatCurrency } from '../utils/formatters';
 import { Invoice } from './Invoice';
 
 const Accessioning: React.FC = () => {
-  const { patients, departments, addRequest, addPatient, settings, getPatientById, requests } = useLab();
+  const { patients, departments, addRequest, addPatient, settings, getPatientById, requests, clients } = useLab();
   
   // State
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -23,6 +23,9 @@ const Accessioning: React.FC = () => {
   // New Fields
   const [sampleType, setSampleType] = useState<string>('Blood');
   const [referrer, setReferrer] = useState<string>('Self');
+  const [showReferrerSuggestions, setShowReferrerSuggestions] = useState(false);
+  const referrerRef = useRef<HTMLDivElement>(null);
+
   const [priority, setPriority] = useState<string>('Normal');
 
   const [discount, setDiscount] = useState<string>('0');
@@ -78,6 +81,28 @@ const Accessioning: React.FC = () => {
       (p.cnic && p.cnic.includes(patientSearch))
     );
   }, [patientSearch, patients]);
+
+  // Referrer Autocomplete Logic
+  const filteredReferrers = useMemo(() => {
+      if (!referrer) return [];
+      const term = referrer.toLowerCase();
+      // Filter out 'Self' from suggestion list to avoid confusion if it's already there, though usually it's not a Client
+      return clients.filter(c => 
+          c.name.toLowerCase().includes(term) || 
+          c.code.toLowerCase().includes(term)
+      ).slice(0, 5);
+  }, [referrer, clients]);
+
+  // Close suggestions on click outside
+  useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+          if (referrerRef.current && !referrerRef.current.contains(event.target as Node)) {
+              setShowReferrerSuggestions(false);
+          }
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Handlers
   const handleAddTest = (test: TestDefinition) => {
@@ -405,16 +430,37 @@ const Accessioning: React.FC = () => {
 
           {/* Clinical Info Inputs */}
           <div className="grid grid-cols-2 gap-4 mt-4 transition-all duration-300">
-            <div className="space-y-1">
+            <div className="space-y-1 relative" ref={referrerRef}>
               <label className="text-xs font-semibold text-slate-500 ml-1">Referrer / Doctor</label>
               <div className="relative">
                 <Stethoscope size={14} className="absolute left-3 top-3 text-slate-400" />
                 <input 
                   className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" 
                   value={referrer}
-                  onChange={e => setReferrer(e.target.value)}
-                  placeholder="Self / Consultant" 
+                  onChange={e => { 
+                      setReferrer(e.target.value);
+                      setShowReferrerSuggestions(true);
+                  }}
+                  onFocus={() => setShowReferrerSuggestions(true)}
+                  placeholder="Type to search doctor..." 
                 />
+                {showReferrerSuggestions && filteredReferrers.length > 0 && (
+                    <ul className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-20 overflow-hidden">
+                        {filteredReferrers.map(doc => (
+                            <li 
+                                key={doc.id}
+                                onClick={() => {
+                                    setReferrer(doc.name);
+                                    setShowReferrerSuggestions(false);
+                                }}
+                                className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex flex-col border-b border-slate-50 last:border-0"
+                            >
+                                <span className="text-sm font-bold text-slate-900">{doc.name}</span>
+                                {doc.contactPerson && <span className="text-xs text-slate-500">{doc.contactPerson}</span>}
+                            </li>
+                        ))}
+                    </ul>
+                )}
               </div>
             </div>
             

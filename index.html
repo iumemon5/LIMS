@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,11 +76,13 @@
       /* Print Styles */
       @media print {
         @page {
-          size: auto;
-          margin: 0mm;
+          size: A4 portrait;
+          margin: 0;
         }
         
-        body {
+        html, body {
+          width: 210mm;
+          height: 297mm;
           background-color: white;
           margin: 0;
           padding: 0;
