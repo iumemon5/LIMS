@@ -39,7 +39,27 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 // We will merge: keep local "unsynced" changes? 
                 // Complexity: High. 
                 // Simple Path: If online, load from Cloud to ensure we have latest from other users.
-                setPatients(data as unknown as Patient[]);
+                const mappedPatients = data.map((p: any) => ({
+                    id: p.id,
+                    mrn: p.mrn,
+                    title: p.title || '',
+                    firstName: p.first_name,
+                    lastName: p.last_name,
+                    relationType: p.relation_type,
+                    relationName: p.relation_name,
+                    cnic: p.cnic,
+                    address: p.address,
+                    age: p.age,
+                    ageUnit: p.age_unit,
+                    gender: p.gender,
+                    contact: p.contact,
+                    email: p.email,
+                    dob: p.dob,
+                    createdAt: p.created_at,
+                    updatedAt: p.updated_at,
+                    createdBy: p.created_by
+                } as Patient));
+                setPatients(mappedPatients);
             }
         };
         fetchPatients();

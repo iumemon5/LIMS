@@ -70,22 +70,83 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [settings, setSettingsState] = useStickyState<LabSettings>(DEFAULT_SETTINGS, 'lims_settings');
     const [auditLogs, setAuditLogs] = useStickyState<AuditLog[]>(AUDIT_LOGS, 'lims_audit_logs');
 
-    // Hydrate Requests
+    // Hydrate Data from Supabase
     React.useEffect(() => {
-        const fetchRequests = async () => {
+        const hydrateData = async () => {
             if (!navigator.onLine) return;
-            // Check if we need hydration logic here. 
-            // For now, simpler to rely on Cache first, but typically we want to pull new items.
-            // Skipped for brevity to match "Offline First" priority.
+
+            // 1. Fetch Requests
+            const { data: reqData } = await supabase.from('analysis_requests').select('*').order('created_at', { ascending: false });
+            if (reqData) {
+                const mappedRequests = reqData.map((r: any) => ({
+                    id: r.id,
+                    clientId: r.client_id,
+                    patientId: r.patient_id,
+                    sampleType: r.sample_type,
+                    status: r.status,
+                    priority: r.priority,
+                    totalFee: r.total_fee,
+                    discount: r.discount,
+                    paidAmount: r.paid_amount,
+                    dueAmount: (r.total_fee || 0) - (r.discount || 0) - (r.paid_amount || 0),
+                    referrer: r.referrer,
+                    analyses: r.analyses || [],
+                    dateReceived: r.created_at, // Use created_at as dateReceived
+                    createdAt: r.created_at,
+                    updatedAt: r.updated_at,
+                    createdBy: r.created_by
+                } as AnalysisRequest));
+                setRequests(mappedRequests);
+            }
+
+            // 2. Fetch Clients
+            const { data: clientData } = await supabase.from('clients').select('*');
+            if (clientData) {
+                const mappedClients = clientData.map((c: any) => ({
+                    id: c.id,
+                    name: c.name,
+                    code: c.code,
+                    contactPerson: c.contact_person,
+                    email: c.email,
+                    phone: c.phone,
+                    createdAt: c.created_at,
+                    updatedAt: c.updated_at,
+                    createdBy: c.created_by
+                } as Client));
+                setClients(mappedClients);
+            }
+
+            // 3. Fetch Inventory
+            const { data: invData, error: invError } = await supabase.from('inventory').select('*');
+            if (invError) console.error('[Hydrate] Inventory Error:', invError);
+            if (invData) {
+                console.log('[Hydrate] Inventory Items:', invData.length);
+                const mappedInventory = invData.map((i: any) => ({
+                    id: i.id,
+                    name: i.name,
+                    category: i.category,
+                    lotNumber: i.lot_number,
+                    expiryDate: i.expiry_date,
+                    quantity: i.quantity,
+                    unit: i.unit,
+                    minLevel: i.min_level,
+                    location: i.location,
+                    createdAt: i.created_at,
+                    updatedAt: i.updated_at,
+                    createdBy: i.created_by
+                } as InventoryItem));
+                setInventory(mappedInventory);
+            }
         };
-        fetchRequests();
+
+        hydrateData();
     }, [isOnline]);
 
 
     // Helper for Logging
     const logAction = useCallback((action: string, resourceType: string, resourceId: string, details: string, before?: any, after?: any) => {
         const newLog: AuditLog = {
-            id: `LOG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            id: crypto.randomUUID(),
             timestamp: new Date().toISOString(),
             user: user?.name || 'System',
             action,

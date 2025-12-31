@@ -2,18 +2,21 @@ import React, { createContext, useContext } from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { PatientProvider, usePatient } from './PatientContext';
 import { LabOpsProvider, useLabOps } from './LabOpsContext';
+import { SyncProvider } from './SyncContext';
 
 // We explicitly re-export the contexts if needed, but primarily we want the Provider and the Hook.
 
 export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return (
-        <AuthProvider>
-            <PatientProvider>
-                <LabOpsProvider>
-                    {children}
-                </LabOpsProvider>
-            </PatientProvider>
-        </AuthProvider>
+        <SyncProvider>
+            <AuthProvider>
+                <PatientProvider>
+                    <LabOpsProvider>
+                        {children}
+                    </LabOpsProvider>
+                </PatientProvider>
+            </AuthProvider>
+        </SyncProvider>
     );
 };
 
