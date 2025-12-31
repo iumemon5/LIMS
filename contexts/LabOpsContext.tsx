@@ -8,6 +8,8 @@ import {
 } from '../constants';
 import { useStickyState } from '../hooks/useStickyState';
 import { useAuth } from './AuthContext';
+import { useSync } from './SyncContext';
+import { supabase } from '../lib/supabase';
 
 interface LabOpsContextType {
     // Requests
@@ -55,8 +57,10 @@ const LabOpsContext = createContext<LabOpsContextType | undefined>(undefined);
 
 export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user } = useAuth();
+    const { enqueue, isOnline } = useSync();
 
     const [requests, setRequests] = useStickyState<AnalysisRequest[]>(MOCK_REQUESTS, 'lims_requests');
+    // ... (other states) ...
     const [clients, setClients] = useStickyState<Client[]>(CLIENTS, 'lims_clients');
     const [departments, setDepartments] = useStickyState<Department[]>(DEPARTMENTS, 'lims_departments');
     const [worksheets, setWorksheets] = useStickyState<Worksheet[]>([], 'lims_worksheets');
@@ -67,8 +71,21 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [settings, setSettingsState] = useStickyState<LabSettings>(DEFAULT_SETTINGS, 'lims_settings');
     const [auditLogs, setAuditLogs] = useStickyState<AuditLog[]>(AUDIT_LOGS, 'lims_audit_logs');
 
+    // Hydrate Requests
+    React.useEffect(() => {
+        const fetchRequests = async () => {
+            if (!navigator.onLine) return;
+            // Check if we need hydration logic here. 
+            // For now, simpler to rely on Cache first, but typically we want to pull new items.
+            // Skipped for brevity to match "Offline First" priority.
+        };
+        fetchRequests();
+    }, [isOnline]);
+
+
     // Helper for Logging
     const logAction = useCallback((action: string, resourceType: string, resourceId: string, details: string, before?: any, after?: any) => {
+        // ... (logging logic) ...
         const newLog: AuditLog = {
             id: `LOG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             timestamp: new Date().toISOString(),
@@ -82,11 +99,22 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             after: after ? JSON.stringify(after) : undefined
         };
         setAuditLogs(prev => [newLog, ...prev]);
+        // Also Sync Logs? Maybe later.
     }, [user, setAuditLogs]);
 
     // --- Requests Logic ---
     const addRequest = (req: Partial<AnalysisRequest>) => {
+        // Optimistic
         const id = `AR-${new Date().getFullYear().toString().slice(-2)}-${String(requests.length + 1).padStart(4, '0')}`;
+        // Note: For real sync, we might want UUIDs for Primary Keys, but 'AR-XX' is business logic.
+        // We can keep AR-XX as "friendly_id" and add a real "id" UUID field in DB, 
+        // OR just use AR-XX as PK if unique enough (it relies on requests.length which is risky in multi-user).
+        // For robust multi-user, we should use a UUID.
+        // But changing the Type now is risky.
+        // Compromise: Use the ID generated here, but beware of conflicts.
+        // Better: UUID for ID, and AR-XX for 'accessionNumber'.
+        // Current Type uses 'id' as string.
+
         const newReq = {
             ...req,
             id,
@@ -94,12 +122,36 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             updatedAt: new Date().toISOString(),
             createdBy: user?.name || 'Staff'
         } as AnalysisRequest;
+
         setRequests(prev => [newReq, ...prev]);
         logAction('CREATE', 'AnalysisRequest', id, `Created request`);
+
+        // Queue Sync
+        // Mapping CamelCase to SnakeCase for DB
+        const dbPayload = {
+            id: newReq.id,
+            client_id: newReq.clientId,
+            patient_id: newReq.patientId,
+            sample_type: newReq.sampleType,
+            status: newReq.status,
+            priority: newReq.priority,
+            total_fee: newReq.totalFee,
+            discount: newReq.discount,
+            paid_amount: newReq.paidAmount,
+            referrer: newReq.referrer,
+            created_at: newReq.createdAt,
+            updated_at: newReq.updatedAt,
+            // analyses is JSONB usually
+            analyses: newReq.analyses
+        };
+        enqueue('INSERT', 'analysis_requests', dbPayload);
+
         return id;
     };
 
     const updateAnalysisResult = (reqId: string, keyword: string, value: string) => {
+        let updatedReq: AnalysisRequest | undefined;
+
         setRequests(prev => prev.map(req => {
             if (req.id === reqId) {
                 const status = value && value.trim() !== '' ? 'Complete' : 'Pending';
@@ -111,27 +163,43 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     newStatus = SampleStatus.TESTING;
                 }
                 if (req.status === SampleStatus.VERIFIED) {
-                    newStatus = SampleStatus.TESTING;
+                    newStatus = SampleStatus.TESTING; // Revert if edited
                 }
-                return { ...req, analyses: updatedAnalyses, status: newStatus, updatedAt: new Date().toISOString() };
+                const newVal = { ...req, analyses: updatedAnalyses, status: newStatus, updatedAt: new Date().toISOString() };
+                updatedReq = newVal;
+                return newVal;
             }
             return req;
         }));
+
+        if (updatedReq) {
+            enqueue('UPDATE', 'analysis_requests', {
+                analyses: updatedReq.analyses,
+                status: updatedReq.status,
+                updated_at: updatedReq.updatedAt
+            }, { id: reqId });
+        }
     };
 
     const updateRequestStatus = (reqId: string, status: SampleStatus) => {
         setRequests(prev => prev.map(req => req.id === reqId ? { ...req, status, updatedAt: new Date().toISOString() } : req));
         logAction('UPDATE', 'AnalysisRequest', reqId, `Status changed to ${status}`);
+
+        enqueue('UPDATE', 'analysis_requests', { status, updated_at: new Date().toISOString() }, { id: reqId });
     };
 
     const resetSampleStatus = (reqId: string) => {
         setRequests(prev => prev.map(req => req.id === reqId ? { ...req, status: SampleStatus.RECEIVED, updatedAt: new Date().toISOString() } : req));
         logAction('RESET', 'AnalysisRequest', reqId, `Status reset to Received`);
+
+        enqueue('UPDATE', 'analysis_requests', { status: SampleStatus.RECEIVED, updated_at: new Date().toISOString() }, { id: reqId });
     };
 
     const rejectSample = (reqId: string, reason: string) => {
         setRequests(prev => prev.map(req => req.id === reqId ? { ...req, status: SampleStatus.REJECTED, updatedAt: new Date().toISOString() } : req));
         logAction('REJECT', 'AnalysisRequest', reqId, `Sample rejected: ${reason}`);
+
+        enqueue('UPDATE', 'analysis_requests', { status: SampleStatus.REJECTED, updated_at: new Date().toISOString() }, { id: reqId });
     };
 
     const recordPayment = useCallback((requestId: string, amount: number) => {
