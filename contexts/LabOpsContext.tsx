@@ -47,6 +47,7 @@ interface LabOpsContextType {
     auditLogs: AuditLog[];
     logAction: (action: string, resourceType: string, resourceId: string, details: string, before?: any, after?: any) => void;
     logReportGeneration: (type: string, format: string) => void;
+    logQC: (testCode: string, result: string, status: 'Pass' | 'Fail') => void;
     factoryReset: () => void;
 }
 
@@ -235,6 +236,10 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         logAction('REPORT_GENERATE', 'Report', type, `Generated ${format} report`);
     };
 
+    const logQC = (testCode: string, result: string, status: 'Pass' | 'Fail') => {
+        logAction('QC_CHECK', 'QC', testCode, `QC Analysis: ${result} (${status})`);
+    };
+
     const factoryReset = useCallback(() => {
         if (window.confirm("Are you sure? This will wipe all local data and restore defaults.")) {
             localStorage.clear();
@@ -250,7 +255,7 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             worksheets, createWorksheet, closeWorksheet,
             inventory, addInventoryItem, updateStock,
             settings, updateSettings,
-            auditLogs, logAction, logReportGeneration, factoryReset
+            auditLogs, logAction, logReportGeneration, logQC, factoryReset
         }}>
             {children}
         </LabOpsContext.Provider>

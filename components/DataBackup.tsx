@@ -8,16 +8,15 @@ export const DataBackup: React.FC = () => {
 
     const getBackupData = () => {
         const keys = [
-            'lims_patients_cache',
-            'lims_requests_cache',
-            'lims_inventory_cache',
-            'lims_sync_queue',
-            'lims_audit_logs_cache',
+            'lims_patients', // Actually used in PatientContext (checked separately, but standardizing)
+            'lims_requests',
+            'lims_inventory',
             'lims_clients',
             'lims_departments',
             'lims_worksheets',
-            'lims_instruments',
-            'lims_settings'
+            'lims_settings',
+            'lims_audit_logs',
+            'lims_sync_queue' // Also meaningful to backup
         ];
 
         const backup: Record<string, any> = {
@@ -39,6 +38,12 @@ export const DataBackup: React.FC = () => {
                 }
             }
         });
+
+        // Patient Context uses a specific key, ensure we capture it if different
+        // In previous context files, we saw 'lims_patients_cache' or 'lims_patients'
+        // Let's grab both to be safe
+        const legacyPatient = localStorage.getItem('lims_patients_cache');
+        if (legacyPatient) backup.data['lims_patients_cache'] = JSON.parse(legacyPatient);
 
         return backup;
     };
