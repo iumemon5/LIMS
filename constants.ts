@@ -13,8 +13,8 @@ const MOCK_META = {
   createdBy: 'system_init'
 };
 
-// Base64 hash for 'admin123' -> 'YWRtaW4xMjM='
-const DEFAULT_HASH = 'YWRtaW4xMjM=';
+// SHA-256 hash for 'admin123'
+const DEFAULT_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
 
 export const DEFAULT_SETTINGS: LabSettings = {
   name: 'M-Solutions LIMS',
@@ -36,35 +36,35 @@ export const DEFAULT_SETTINGS: LabSettings = {
 };
 
 export const DEFAULT_USERS: User[] = [
-  { 
-    id: 'USR-ADMIN-01', 
-    name: 'Administrator', 
+  {
+    id: 'USR-ADMIN-01',
+    name: 'Administrator',
     email: 'admin@msolutions.pk',
-    passwordHash: DEFAULT_HASH, 
-    role: 'Super Admin', 
-    status: 'Active', 
-    lastLogin: hoursAgo(1), 
-    ...MOCK_META 
-  },
-  { 
-    id: 'USR-PATH-01', 
-    name: 'Dr. Faisal Khan', 
-    email: 'faisal@msolutions.pk', 
     passwordHash: DEFAULT_HASH,
-    role: 'Pathologist', 
-    status: 'Active', 
-    lastLogin: daysAgo(1), 
-    ...MOCK_META 
+    role: 'Super Admin',
+    status: 'Active',
+    lastLogin: hoursAgo(1),
+    ...MOCK_META
   },
-  { 
-    id: 'USR-TECH-01', 
-    name: 'Sarah Ahmed', 
-    email: 'sarah@msolutions.pk', 
+  {
+    id: 'USR-PATH-01',
+    name: 'Dr. Faisal Khan',
+    email: 'faisal@msolutions.pk',
     passwordHash: DEFAULT_HASH,
-    role: 'Technician', 
-    status: 'Inactive', 
-    lastLogin: daysAgo(5), 
-    ...MOCK_META 
+    role: 'Pathologist',
+    status: 'Active',
+    lastLogin: daysAgo(1),
+    ...MOCK_META
+  },
+  {
+    id: 'USR-TECH-01',
+    name: 'Sarah Ahmed',
+    email: 'sarah@msolutions.pk',
+    passwordHash: DEFAULT_HASH,
+    role: 'Technician',
+    status: 'Inactive',
+    lastLogin: daysAgo(5),
+    ...MOCK_META
   }
 ];
 
@@ -104,29 +104,29 @@ export const DEPARTMENTS: Department[] = [
 ];
 
 export const PATIENTS: Patient[] = [
-  { 
-    id: 'PAT-HABI-001', 
-    mrn: '251121-001', 
-    firstName: 'Habibullah', 
-    lastName: 'Khan', 
-    age: 45, 
-    ageUnit: 'Year', 
-    dob: '1979-04-12', 
-    gender: 'Male', 
-    contact: '0300-1234567', 
+  {
+    id: 'PAT-HABI-001',
+    mrn: '251121-001',
+    firstName: 'Habibullah',
+    lastName: 'Khan',
+    age: 45,
+    ageUnit: 'Year',
+    dob: '1979-04-12',
+    gender: 'Male',
+    contact: '0300-1234567',
     ...MOCK_META,
     createdAt: daysAgo(15)
   },
-  { 
-    id: 'PAT-SAMI-002', 
-    mrn: '251121-002', 
-    firstName: 'Samina', 
-    lastName: 'Ahmed', 
-    age: 32, 
-    ageUnit: 'Year', 
-    dob: '1992-08-25', 
-    gender: 'Female', 
-    contact: '0321-7654321', 
+  {
+    id: 'PAT-SAMI-002',
+    mrn: '251121-002',
+    firstName: 'Samina',
+    lastName: 'Ahmed',
+    age: 32,
+    ageUnit: 'Year',
+    dob: '1992-08-25',
+    gender: 'Female',
+    contact: '0321-7654321',
     ...MOCK_META,
     createdAt: daysAgo(10)
   },
@@ -179,14 +179,14 @@ export const MOCK_REQUESTS: AnalysisRequest[] = [
 ];
 
 export const AUDIT_LOGS: AuditLog[] = [
-  { 
-    id: 'LOG-INIT-1', 
-    timestamp: daysAgo(1), 
-    user: 'system', 
-    action: 'INITIALIZE', 
-    resourceType: 'System', 
-    resourceId: 'Global', 
-    correlationId: 'CID-BOOT-001', 
-    details: 'Laboratory information system initialized with seed data.' 
+  {
+    id: 'LOG-INIT-1',
+    timestamp: daysAgo(1),
+    user: 'system',
+    action: 'INITIALIZE',
+    resourceType: 'System',
+    resourceId: 'Global',
+    correlationId: 'CID-BOOT-001',
+    details: 'Laboratory information system initialized with seed data.'
   }
 ];
