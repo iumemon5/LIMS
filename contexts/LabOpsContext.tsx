@@ -257,10 +257,52 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     // --- Departments ---
-    // (Skipping sync for Departments/Tests for now as they are usually static admin config, 
-    // but follow same pattern if needed)
+    const addDepartment = (dept: Omit<Department, keyof BaseEntity>) => {
+        const id = dept.name.toUpperCase().slice(0, 4);
+        setDepartments(prev => [...prev, { ...dept, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: user?.name || 'Admin' }]);
+        logAction('CREATE', 'Department', id, `Added department ${dept.name}`);
+    };
 
-    // ...
+    const addTest = (deptId: string, test: TestDefinition) => {
+        setDepartments(prev => prev.map(d => {
+            if (d.id === deptId) {
+                return { ...d, tests: [...d.tests, test], testCount: d.testCount + 1 };
+            }
+            return d;
+        }));
+        logAction('UPDATE', 'Department', deptId, `Added test ${test.name}`);
+    };
+
+    const updateTest = (deptId: string, test: TestDefinition) => {
+        setDepartments(prev => prev.map(d => {
+            if (d.id === deptId) {
+                return { ...d, tests: d.tests.map(t => t.code === test.code ? test : t) };
+            }
+            return d;
+        }));
+        logAction('UPDATE', 'Department', deptId, `Updated test ${test.code}`);
+    };
+
+    const deleteTest = (deptId: string, code: string) => {
+        setDepartments(prev => prev.map(d => {
+            if (d.id === deptId) {
+                return { ...d, tests: d.tests.filter(t => t.code !== code), testCount: d.testCount - 1 };
+            }
+            return d;
+        }));
+        logAction('UPDATE', 'Department', deptId, `Deleted test ${code}`);
+    };
+
+    // --- Worksheets ---
+    const createWorksheet = (ws: Worksheet) => {
+        setWorksheets(prev => [...prev, ws]);
+        logAction('CREATE', 'Worksheet', ws.id, `Created worksheet ${ws.name}`);
+    };
+
+    const closeWorksheet = (id: string) => {
+        setWorksheets(prev => prev.map(ws => ws.id === id ? { ...ws, status: 'Closed' as const } : ws));
+        logAction('UPDATE', 'Worksheet', id, `Closed worksheet`);
+    };
 
     // --- Inventory ---
     const addInventoryItem = (item: InventoryItem) => {

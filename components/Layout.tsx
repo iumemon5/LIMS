@@ -63,7 +63,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
     { id: 3, title: 'New Protocol v2.1', time: '2 hours ago', type: 'info', icon: <Info size={16} className="text-blue-500" /> },
   ]);
 
-  // Grouped Navigation Structure
+  // Filtered Navigation Structure Based on RBAC
   const navGroups = [
     {
       title: 'Clinical',
@@ -78,8 +78,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       title: 'Operations',
       items: [
         { id: 'worksheets', label: 'Worksheets', icon: <FileSpreadsheet size={20} /> },
-        { id: 'inventory', label: 'Inventory', icon: <Package size={20} /> },
-        { id: 'inventory', label: 'Inventory', icon: <Package size={20} /> },
+        // Only Super Admin or Pathologist (Managers) can see Inventory
+        ...(user?.role === 'Super Admin' || user?.role === 'Pathologist' ? [
+          { id: 'inventory', label: 'Inventory', icon: <Package size={20} /> }
+        ] : []),
       ]
     },
     {
@@ -87,7 +89,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       items: [
         { id: 'clients', label: 'Referrers', icon: <HeartPulse size={20} /> },
         { id: 'billing', label: 'Billing & Invoices', icon: <Receipt size={20} /> },
-        { id: 'departments', label: 'Dept. & Tests', icon: <Beaker size={20} /> },
+        // Only Admin can see Department configuration
+        ...(user?.role === 'Super Admin' ? [
+          { id: 'departments', label: 'Dept. & Tests', icon: <Beaker size={20} /> }
+        ] : []),
       ]
     },
     {
@@ -95,12 +100,15 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       items: [
         { id: 'reports', label: 'Reports', icon: <BarChart3 size={20} /> },
         { id: 'quality', label: 'Compliance', icon: <ShieldCheck size={20} /> },
-        { id: 'settings', label: 'Settings', icon: <Settings size={20} /> },
+        // Only Admin can see System Settings
+        ...(user?.role === 'Super Admin' ? [
+          { id: 'settings', label: 'Settings', icon: <Settings size={20} /> }
+        ] : []),
       ]
     }
   ];
 
-  // Flat list for search
+  // Flat list for search (only modules user has access to)
   const allMenuItems = navGroups.flatMap(g => g.items);
 
   // Search Indexer
