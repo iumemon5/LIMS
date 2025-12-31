@@ -60,7 +60,6 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const { enqueue, isOnline } = useSync();
 
     const [requests, setRequests] = useStickyState<AnalysisRequest[]>(MOCK_REQUESTS, 'lims_requests');
-    // ... (other states) ...
     const [clients, setClients] = useStickyState<Client[]>(CLIENTS, 'lims_clients');
     const [departments, setDepartments] = useStickyState<Department[]>(DEPARTMENTS, 'lims_departments');
     const [worksheets, setWorksheets] = useStickyState<Worksheet[]>([], 'lims_worksheets');
@@ -85,7 +84,6 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Helper for Logging
     const logAction = useCallback((action: string, resourceType: string, resourceId: string, details: string, before?: any, after?: any) => {
-        // ... (logging logic) ...
         const newLog: AuditLog = {
             id: `LOG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             timestamp: new Date().toISOString(),
@@ -99,8 +97,21 @@ export const LabOpsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             after: after ? JSON.stringify(after) : undefined
         };
         setAuditLogs(prev => [newLog, ...prev]);
-        // Also Sync Logs? Maybe later.
-    }, [user, setAuditLogs]);
+
+        // Sync Audit Log to Supabase (Immutable Cloud Trail)
+        enqueue('INSERT', 'audit_logs', {
+            id: newLog.id,
+            timestamp: newLog.timestamp,
+            user: newLog.user,
+            action: newLog.action,
+            resource_type: newLog.resourceType,
+            resource_id: newLog.resourceId,
+            details: newLog.details,
+            before: newLog.before ? JSON.parse(newLog.before) : null,
+            after: newLog.after ? JSON.parse(newLog.after) : null,
+            correlation_id: newLog.correlationId
+        });
+    }, [user, setAuditLogs, enqueue]);
 
     // --- Requests Logic ---
     const addRequest = (req: Partial<AnalysisRequest>) => {

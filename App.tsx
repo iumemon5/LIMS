@@ -227,20 +227,28 @@ const ProtectedApp: React.FC = () => {
     }
 
     const renderContent = () => {
+        // Simple Access Control Check
+        const isAdmin = user?.role === 'Super Admin';
+        const isManager = isAdmin || user?.role === 'Pathologist';
+
         switch (activeTab) {
             case 'dashboard': return <Dashboard onNavigate={setActiveTab} />;
             case 'accessioning': return <Accessioning />;
             case 'samples': return <SampleList />;
             case 'patients': return <PatientManagement />;
-            case 'departments': return <Departments />;
+            case 'departments':
+                if (!isAdmin) return <AccessDenied />;
+                return <Departments />;
             case 'clients': return <ClientList />;
             case 'billing': return <Billing />;
             case 'quality': return <Compliance />;
             case 'reports': return <Reports />;
-            case 'inventory': return <Inventory />;
-            case 'worksheets': return <Worksheets />;
+            case 'inventory':
+                if (!isManager) return <AccessDenied />;
+                return <Inventory />;
             case 'worksheets': return <Worksheets />;
             case 'settings':
+                if (!isAdmin) return <AccessDenied />;
                 return (
                     <div className="max-w-2xl mx-auto space-y-6">
                         <h2 className="text-2xl font-black text-slate-800">System Settings</h2>
@@ -260,6 +268,28 @@ const ProtectedApp: React.FC = () => {
                 );
         }
     };
+
+    // Simple Access Denied Component
+    const AccessDenied = () => (
+        <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in zoom-in-95">
+            <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center shadow-inner">
+                <Lock size={48} strokeWidth={1.5} />
+            </div>
+            <div className="space-y-2">
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Access Restricted</h2>
+                <p className="text-slate-500 max-w-sm font-medium">
+                    You do not have the required permissions to access this administrative module.
+                    Please contact your system administrator.
+                </p>
+            </div>
+            <button
+                onClick={() => setActiveTab('dashboard')}
+                className="px-6 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-sm shadow-lg hover:bg-slate-800 transition-all active:scale-95"
+            >
+                Return to Dashboard
+            </button>
+        </div>
+    );
 
     return (
         <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
